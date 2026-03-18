@@ -98,6 +98,31 @@
   .page-title{font-size:26px;font-weight:600;color:var(--blue-900);letter-spacing:-.03em;display:flex;align-items:center;gap:10px;margin-bottom:4px}
   .page-desc{font-size:14px;color:var(--gray-400)}
 
+  /* How it works modal */
+  .hiw-trigger{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--blue-400);cursor:pointer;font-weight:500;margin-left:8px;padding:3px 8px;border-radius:var(--radius-sm);transition:all .15s}
+  .hiw-trigger:hover{background:var(--blue-50);color:var(--blue-600)}
+  .hiw-overlay{position:fixed;inset:0;z-index:250;background:rgba(4,44,83,.4);display:flex;align-items:center;justify-content:center;animation:overlayIn .2s ease}
+  .hiw-overlay.hidden{display:none}
+  .hiw-modal{background:#fff;border-radius:16px;border:1px solid var(--gray-200);width:520px;max-width:94vw;max-height:85vh;overflow-y:auto;padding:32px;animation:modalIn .22s ease;position:relative}
+  .hiw-close{position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gray-400);font-size:16px;transition:all .15s}
+  .hiw-close:hover{border-color:var(--blue-200);color:var(--gray-900);background:var(--gray-50)}
+  .hiw-title{font-size:18px;font-weight:600;color:var(--blue-900);margin-bottom:2px}
+  .hiw-sub{font-size:13px;color:var(--gray-400);margin-bottom:24px}
+  .hiw-section-label{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px}
+  .hiw-steps{display:flex;flex-direction:column;gap:0;margin-bottom:28px;border:1px solid var(--gray-200);border-radius:var(--radius);overflow:hidden}
+  .hiw-step{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--gray-100)}
+  .hiw-step:last-child{border-bottom:none}
+  .hiw-step-num{width:28px;height:28px;border-radius:50%;background:var(--blue-50);color:var(--blue-600);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+  .hiw-step-text{font-size:13.5px;color:var(--gray-900);line-height:1.5}
+  .hiw-step-text strong{font-weight:600}
+  .hiw-diff-table{width:100%;border-collapse:collapse}
+  .hiw-diff-table th{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:8px 12px;border-bottom:1px solid var(--gray-200)}
+  .hiw-diff-table td{padding:12px;font-size:13px;color:var(--gray-900);border-bottom:1px solid var(--gray-100)}
+  .hiw-diff-table tr:last-child td{border-bottom:none}
+  .hiw-diff-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px}
+  .hiw-diff-dot.easy{background:var(--green-text)}.hiw-diff-dot.medium{background:#D97706}.hiw-diff-dot.hard{background:var(--red-text)}
+  .hiw-diff-label.easy{color:var(--green-text);font-weight:500}.hiw-diff-label.medium{color:#D97706;font-weight:500}.hiw-diff-label.hard{color:var(--red-text);font-weight:500}
+
   /* Scenario cards */
   .practice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px}
   .practice-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:border-color .15s,box-shadow .15s;display:flex;flex-direction:column;gap:8px}
@@ -354,10 +379,37 @@
 
   <!-- Main content -->
   <main class="main" id="main-content">
+    <!-- How it works modal -->
+    <div class="hiw-overlay hidden" id="hiw-overlay" onclick="if(event.target===this)this.classList.add('hidden')">
+      <div class="hiw-modal">
+        <div class="hiw-close" onclick="document.getElementById('hiw-overlay').classList.add('hidden')">&times;</div>
+        <div class="hiw-title">How it works</div>
+        <div class="hiw-sub">Everything you need to get started</div>
+
+        <div class="hiw-section-label">Steps</div>
+        <div class="hiw-steps">
+          <div class="hiw-step"><div class="hiw-step-num">1</div><div class="hiw-step-text">Set <strong>difficulty</strong> &amp; <strong>category</strong>, pick a scenario or hit 🎲 Random</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">2</div><div class="hiw-step-text">Turn on <strong>Guided Mode</strong> for step-by-step coaching tips</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">3</div><div class="hiw-step-text">Respond as a <strong>CS agent</strong> — the merchant replies in real time</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">4</div><div class="hiw-step-text">Click 📝 <strong>End &amp; Get Score</strong> to see your evaluation</div></div>
+        </div>
+
+        <div class="hiw-section-label">Difficulty Levels</div>
+        <table class="hiw-diff-table">
+          <thead><tr><th>Level</th><th>Customer Type</th><th>Scenario Type</th></tr></thead>
+          <tbody>
+            <tr><td><span class="hiw-diff-dot easy"></span><span class="hiw-diff-label easy">Easy</span></td><td>Friendly, patient</td><td>How-to, presales</td></tr>
+            <tr><td><span class="hiw-diff-dot medium"></span><span class="hiw-diff-label medium">Medium</span></td><td>Confused, price-sensitive</td><td>Bugs, billing</td></tr>
+            <tr><td><span class="hiw-diff-dot hard"></span><span class="hiw-diff-label hard">Hard</span></td><td>Angry, impatient</td><td>Complaints, edge cases</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Practice page -->
     <div class="page" id="page-practice">
       <div class="page-header">
-        <div class="page-title">💬 Practice</div>
+        <div class="page-title">💬 Practice <span class="hiw-trigger" onclick="document.getElementById('hiw-overlay').classList.remove('hidden')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> How it works</span></div>
         <p class="page-desc">Choose a scenario below or hit Random to start practicing</p>
       </div>
       <div id="scenarios-grid" class="practice-grid"></div>
