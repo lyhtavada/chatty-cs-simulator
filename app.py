@@ -37,6 +37,9 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
+# --- In-memory chat session store (avoids cookie size limit) ---
+chat_sessions: dict[str, dict] = {}
+
 # --- Personas by difficulty ---
 PERSONAS_BY_DIFFICULTY = {
     "easy": [
@@ -427,9 +430,9 @@ def api_start_session():
         except Exception:
             pass
 
-    # Store session data server-side
+    # Store session data in memory
     session_id = f"{int(time.time())}_{random.randint(1000,9999)}"
-    session[f"sess_{session_id}"] = {
+    chat_sessions[session_id] = {
         "scenario": scenario,
         "persona": persona,
         "customer_prompt": customer_prompt,
@@ -460,8 +463,7 @@ def api_send_message():
     session_id = data.get("session_id")
     agent_message = data.get("message", "").strip()
 
-    sess_key = f"sess_{session_id}"
-    sess = session.get(sess_key)
+    sess = chat_sessions.get(session_id)
     if not sess:
         return jsonify({"error": "Session not found"}), 404
     if not agent_message:
@@ -493,8 +495,6 @@ def api_send_message():
             customer_reply = f"(Error: {e})"
 
     sess["history"].append({"role": "assistant", "content": customer_reply})
-    session[sess_key] = sess  # Save back
-    session.modified = True
 
     # Guided step hint
     turn = sess["turn_count"]
@@ -528,8 +528,7 @@ def api_end_session():
     session_id = data.get("session_id")
     agent_name = data.get("agent_name", session.get("agent_name", "Anonymous"))
 
-    sess_key = f"sess_{session_id}"
-    sess = session.get(sess_key)
+    sess = chat_sessions.get(session_id)
     if not sess:
         return jsonify({"error": "Session not found"}), 404
 
@@ -606,7 +605,7 @@ def api_end_session():
             print(f"Supabase save error: {e}")
 
     # Clean up session
-    session.pop(sess_key, None)
+    chat_sessions.pop(session_id, None)
 
     return jsonify({
         "grading_text": grading_text,
@@ -621,7 +620,7 @@ def api_end_session():
 def api_hint():
     data = request.json
     session_id = data.get("session_id")
-    sess = session.get(f"sess_{session_id}")
+    sess = chat_sessions.get(session_id)
     if not sess:
         return jsonify({"hint": "Follow the 8-step livechat process."})
     intent = sess["scenario"]["intent"]
