@@ -2,20 +2,19 @@
 Customer Simulator — Web UI (Streamlit) for CS Live Chat Training (Chatty)
 
 Setup:
-1. pip install streamlit groq anthropic pyyaml pandas
-2. export GROQ_API_KEY="your-key"
-3. Optional: export ANTHROPIC_API_KEY="your-key" (for Claude grading)
-4. streamlit run web_simulator.py
+1. pip install streamlit groq anthropic pyyaml pandas supabase
+2. Set secrets: GROQ_API_KEY, SUPABASE_URL, SUPABASE_KEY, LEADER_PASSWORD
+3. streamlit run web_simulator.py
 
 Features:
 - Difficulty levels (Easy / Medium / Hard) with scenario categories
 - Guided Mode — step-by-step coaching for new CS agents
 - Scenario preview before starting + retry same scenario
-- Agent name tracking for individual performance
+- Role-based access: CS agents see own results, Leaders see all
 - Response timer — tracks how fast you reply
 - Dashboard: leaderboard, export CSV, filter by time, score trends
 - Grading via Groq (free) or Claude (better quality)
-- Results saved to JSON for persistence
+- Results persisted to Supabase (PostgreSQL)
 """
 
 import os
@@ -30,22 +29,33 @@ import streamlit as st
 import pandas as pd
 from pathlib import Path
 from groq import Groq
+from supabase import create_client
 
 # --- Config ---
 BASE_DIR = Path(__file__).resolve().parent.parent  # app-chatty/
 SHARED_DIR = BASE_DIR.parent / "shared"
-RESULTS_DIR = BASE_DIR / "scripts" / "results"
-def _get_secret(key: str) -> str:
+
+def _get_secret(key: str, default: str = "") -> str:
     """Read from Streamlit secrets first, then env var."""
     try:
         return st.secrets[key]
     except Exception:
-        return os.environ.get(key, "")
+        return os.environ.get(key, default)
 
 GROQ_API_KEY = _get_secret("GROQ_API_KEY")
 ANTHROPIC_API_KEY = _get_secret("ANTHROPIC_API_KEY")
+SUPABASE_URL = _get_secret("SUPABASE_URL")
+SUPABASE_KEY = _get_secret("SUPABASE_KEY")
+LEADER_PASSWORD = _get_secret("LEADER_PASSWORD", "avada2024")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
+# --- Supabase client ---
+@st.cache_resource
+def get_supabase():
+    if SUPABASE_URL and SUPABASE_KEY:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return None
 
 # --- 8-step livechat checklist (for Guided Mode) ---
 LIVECHAT_STEPS = [
@@ -392,26 +402,85 @@ def grade_with_claude(conversation_text: str, grading_prompt: str, scenario: dic
         return f"Claude grading error: {e}"
 
 
-# --- Results persistence ---
-def _results_file() -> Path:
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    return RESULTS_DIR / "training_results.json"
-
-
-def load_results() -> list[dict]:
-    f = _results_file()
-    if f.exists():
-        try:
-            return json.loads(f.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, ValueError):
-            return []
-    return []
+# --- Results persistence (Supabase) ---
+def load_results(agent_name: str | None = None) -> list[dict]:
+    """Load results from Supabase. If agent_name given, filter by it."""
+    sb = get_supabase()
+    if not sb:
+        return []
+    try:
+        query = sb.table("training_results").select("*").order("created_at", desc=True)
+        if agent_name:
+            query = query.eq("agent_name", agent_name)
+        data = query.execute().data or []
+        # Convert DB rows to legacy format for dashboard compatibility
+        results = []
+        for row in data:
+            scores = {}
+            for key in ["greeting", "empathy", "probing", "expectation", "troubleshoot",
+                         "followup", "achieve_more", "farewell", "tone", "quality"]:
+                val = row.get(f"score_{key}")
+                if val is not None:
+                    scores[key] = val
+            results.append({
+                "timestamp": row.get("created_at", ""),
+                "agent": row.get("agent_name", "Anonymous"),
+                "scenario_id": row.get("scenario_id", ""),
+                "intent": row.get("intent", ""),
+                "category": row.get("category", ""),
+                "difficulty": row.get("difficulty", ""),
+                "persona": row.get("persona", ""),
+                "turns": row.get("turns", 0),
+                "grader": row.get("grader", ""),
+                "scores": scores,
+                "overall": row.get("overall_score", 0),
+                "avg_response_time": row.get("avg_response_time", 0),
+                "max_response_time": row.get("max_response_time", 0),
+                "conversation": row.get("conversation", []),
+                "feedback": row.get("feedback", ""),
+            })
+        return results
+    except Exception as e:
+        st.error(f"Error loading results: {e}")
+        return []
 
 
 def save_result(entry: dict):
-    results = load_results()
-    results.append(entry)
-    _results_file().write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
+    """Save a training result to Supabase."""
+    sb = get_supabase()
+    if not sb:
+        st.warning("Supabase not configured — results not saved.")
+        return
+    scores = entry.get("scores", {})
+    row = {
+        "agent_name": entry.get("agent", "Anonymous"),
+        "scenario_id": entry.get("scenario_id", ""),
+        "intent": entry.get("intent", ""),
+        "category": entry.get("category", ""),
+        "difficulty": entry.get("difficulty", ""),
+        "persona": entry.get("persona", ""),
+        "turns": entry.get("turns", 0),
+        "grader": entry.get("grader", ""),
+        "score_greeting": scores.get("greeting"),
+        "score_empathy": scores.get("empathy"),
+        "score_probing": scores.get("probing"),
+        "score_expectation": scores.get("expectation"),
+        "score_troubleshoot": scores.get("troubleshoot"),
+        "score_followup": scores.get("followup"),
+        "score_achieve_more": scores.get("achieve_more"),
+        "score_farewell": scores.get("farewell"),
+        "score_tone": scores.get("tone"),
+        "score_quality": scores.get("quality"),
+        "overall_score": entry.get("overall", 0),
+        "avg_response_time": entry.get("avg_response_time", 0),
+        "max_response_time": entry.get("max_response_time", 0),
+        "conversation": entry.get("conversation", []),
+        "feedback": entry.get("feedback", ""),
+    }
+    try:
+        sb.table("training_results").insert(row).execute()
+    except Exception as e:
+        st.error(f"Error saving result: {e}")
 
 
 def parse_scores(grading_text: str) -> dict:
@@ -452,10 +521,44 @@ def init_session_state():
         "response_times": [],       # list of float (seconds per reply)
         "last_customer_time": None,  # timestamp when customer last messaged
         "last_scenario_key": None,   # for retry: (difficulty, category, scenario_id)
+        "logged_in": False,
+        "user_role": "agent",       # "agent" or "leader"
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
+
+
+# ------------------------------------------------------------------
+# PAGE: Login
+# ------------------------------------------------------------------
+def page_login():
+    st.title("💬 Chatty — CS Live Chat Training")
+    st.caption("Practice handling customer conversations with AI-simulated merchants")
+
+    st.markdown("---")
+    st.subheader("Login")
+
+    name = st.text_input("Your name", placeholder="e.g. Linh")
+    role = st.radio("Role", ["CS Agent", "Leader"], horizontal=True)
+
+    if role == "Leader":
+        password = st.text_input("Leader password", type="password")
+    else:
+        password = None
+
+    if st.button("Login", type="primary", use_container_width=True):
+        if not name.strip():
+            st.error("Please enter your name.")
+            return
+        if role == "Leader":
+            if password != LEADER_PASSWORD:
+                st.error("Wrong password.")
+                return
+        st.session_state.agent_name = name.strip()
+        st.session_state.user_role = "leader" if role == "Leader" else "agent"
+        st.session_state.logged_in = True
+        st.rerun()
 
 
 def start_session_with_scenario(scenario: dict, difficulty: str):
@@ -581,10 +684,11 @@ def page_practice():
 
     # --- Sidebar ---
     with st.sidebar:
-        st.header("Agent")
-        st.session_state.agent_name = st.text_input(
-            "Your name", value=st.session_state.agent_name, placeholder="e.g. Linh"
-        )
+        st.markdown(f"**Agent:** {st.session_state.agent_name}")
+        if st.button("Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.agent_name = ""
+            st.rerun()
 
         st.divider()
         st.header("New Session")
@@ -825,7 +929,13 @@ def page_practice():
 def page_dashboard():
     st.title("📊 Training Dashboard")
 
-    results = load_results()
+    is_leader = st.session_state.user_role == "leader"
+
+    # Leaders see all results, agents see only their own
+    if is_leader:
+        results = load_results()
+    else:
+        results = load_results(agent_name=st.session_state.agent_name)
 
     if not results:
         st.info("No training sessions yet. Go to **💬 Practice** to start!")
@@ -835,8 +945,11 @@ def page_dashboard():
     with st.sidebar:
         st.header("Filters")
 
-        agents = sorted(set(r.get("agent", "Anonymous") for r in results))
-        selected_agent = st.selectbox("Agent", ["All"] + agents)
+        if is_leader:
+            agents = sorted(set(r.get("agent", "Anonymous") for r in results))
+            selected_agent = st.selectbox("Agent", ["All"] + agents)
+        else:
+            selected_agent = st.session_state.agent_name
 
         difficulties = sorted(set(r.get("difficulty", "?") for r in results))
         selected_diff = st.selectbox("Difficulty", ["All"] + difficulties)
@@ -844,9 +957,14 @@ def page_dashboard():
         # Time filter
         time_filter = st.selectbox("Time Period", ["All Time", "Today", "This Week", "This Month"])
 
+        if st.button("Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.agent_name = ""
+            st.rerun()
+
     # Apply filters
     filtered = results
-    if selected_agent != "All":
+    if is_leader and selected_agent != "All":
         filtered = [r for r in filtered if r.get("agent") == selected_agent]
     if selected_diff != "All":
         filtered = [r for r in filtered if r.get("difficulty") == selected_diff]
@@ -1052,6 +1170,11 @@ def main():
     )
 
     init_session_state()
+
+    # Login gate
+    if not st.session_state.logged_in:
+        page_login()
+        return
 
     page = st.sidebar.radio(
         "Navigation",
