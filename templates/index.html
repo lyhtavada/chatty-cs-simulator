@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CS Training Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue-50:#E6F1FB;--blue-100:#B5D4F4;--blue-200:#85B7EB;--blue-400:#378ADD;
+    --blue-600:#185FA5;--blue-800:#0C447C;--blue-900:#042C53;
+    --gray-50:#F7F8FA;--gray-100:#EEF0F4;--gray-200:#DDE1E9;--gray-400:#9BA3B2;
+    --gray-600:#5A6375;--gray-900:#1A1F2E;
+    --green-bg:#EDFAF3;--green-text:#12845A;--amber-bg:#FEF6E4;--amber-text:#9A6B0C;
+    --red-bg:#FEECEC;--red-text:#C23030;
+    --sidebar-w:260px;--radius:10px;--radius-sm:6px;
+    --font:'DM Sans',sans-serif;--font-mono:'DM Mono',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;font-family:var(--font);background:var(--gray-50);color:var(--gray-900);font-size:14px;line-height:1.5}
+
+  /* Layout */
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* Login */
+  .login-overlay{position:fixed;inset:0;z-index:300;background:var(--gray-50);display:flex;align-items:center;justify-content:center}
+  .login-overlay.hidden{display:none}
+  .login-card{background:#fff;border:1px solid var(--gray-200);border-radius:16px;padding:40px;width:380px;max-width:94vw;text-align:center;box-shadow:0 4px 24px rgba(4,44,83,.08)}
+  .login-card h1{font-size:22px;font-weight:600;color:var(--blue-900);margin-bottom:4px}
+  .login-card p{font-size:13px;color:var(--gray-400);margin-bottom:24px}
+  .login-card .field-group{text-align:left;margin-bottom:16px}
+  .login-card .field-label{font-size:12px;color:var(--gray-600);font-weight:500;margin-bottom:6px;display:block}
+  .login-card .field-input{width:100%;padding:10px 14px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-family:var(--font);font-size:14px;color:var(--gray-900);outline:none;transition:border-color .15s}
+  .login-card .field-input:focus{border-color:var(--blue-400);box-shadow:0 0 0 3px rgba(55,138,221,.1)}
+  .login-role-row{display:flex;gap:8px;margin-bottom:16px}
+  .login-role-btn{flex:1;padding:10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:#fff;font-family:var(--font);font-size:13px;font-weight:500;color:var(--gray-600);cursor:pointer;transition:all .15s;text-align:center}
+  .login-role-btn:hover{border-color:var(--blue-200);color:var(--blue-600)}
+  .login-role-btn.active{background:var(--blue-600);border-color:var(--blue-600);color:#fff}
+  .login-pw{display:none;margin-bottom:16px;text-align:left}
+  .login-pw.show{display:block}
+  .login-btn{width:100%;padding:12px;border-radius:var(--radius-sm);border:none;background:var(--blue-600);color:#fff;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
+  .login-btn:hover{background:var(--blue-800)}
+  .login-error{color:var(--red-text);font-size:12px;margin-top:8px;display:none}
+
+  /* Sidebar */
+  .sidebar{width:var(--sidebar-w);flex-shrink:0;background:#fff;border-right:1px solid var(--gray-200);display:flex;flex-direction:column;overflow-y:auto;animation:slideIn .35s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
+  .sidebar-logo{padding:22px 20px 18px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;gap:10px}
+  .logo-icon{width:32px;height:32px;background:var(--blue-600);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .logo-icon svg{width:16px;height:16px;fill:#fff}
+  .logo-text{font-size:15px;font-weight:600;color:var(--blue-900);letter-spacing:-.02em}
+  .logo-sub{font-size:10px;color:var(--blue-400);font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+  .sidebar-section{padding:20px 20px 0;border-top:1px solid var(--gray-100);margin-top:8px}
+  .section-title{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px}
+  .field-group{margin-bottom:16px}
+  .field-label{font-size:12px;color:var(--gray-600);font-weight:500;margin-bottom:6px;display:block}
+  .field-input{width:100%;padding:8px 12px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;color:var(--gray-900);background:#fff;outline:none;transition:border-color .15s}
+  .field-input:focus{border-color:var(--blue-400);box-shadow:0 0 0 3px rgba(55,138,221,.1)}
+  .difficulty-grid{display:flex;gap:6px}
+  .diff-btn{flex:1;padding:7px 0;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:#fff;font-family:var(--font);font-size:12px;font-weight:500;color:var(--gray-600);cursor:pointer;transition:all .15s;text-align:center}
+  .diff-btn:hover{border-color:var(--blue-200);color:var(--blue-600)}
+  .diff-btn.active{background:var(--blue-600);border-color:var(--blue-600);color:#fff}
+  .diff-btn.easy.active{background:var(--green-text);border-color:var(--green-text)}
+  .diff-btn.medium.active{background:#D97706;border-color:#D97706}
+  .diff-btn.hard.active{background:var(--red-text);border-color:var(--red-text)}
+  .select-wrap{position:relative}
+  .field-select{width:100%;padding:8px 32px 8px 12px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;color:var(--gray-900);background:#fff;appearance:none;outline:none;cursor:pointer}
+  .field-select:focus{border-color:var(--blue-400)}
+  .select-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--gray-400)}
+  .scenarios-count{font-size:11px;color:var(--blue-400);font-weight:500;margin-top:6px}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .toggle-label{font-size:13px;color:var(--gray-600);font-weight:400}
+  .toggle{width:36px;height:20px;border-radius:10px;background:var(--blue-600);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+  .toggle::after{content:'';position:absolute;top:3px;right:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:right .2s}
+  .toggle.off{background:var(--gray-200)}
+  .toggle.off::after{right:auto;left:3px}
+  .sidebar-actions{padding:0 12px 16px;margin-top:4px}
+  .btn-random{width:100%;padding:10px 14px;border-radius:var(--radius-sm);border:none;background:var(--blue-600);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s}
+  .btn-random:hover{background:var(--blue-800)}
+  .sidebar-nav-bottom{padding:8px 12px 12px;border-top:1px solid var(--gray-100)}
+  .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:500;color:var(--gray-600);transition:background .15s,color .15s;margin-bottom:2px}
+  .nav-item:hover{background:var(--gray-50);color:var(--gray-900)}
+  .nav-item.active{background:var(--blue-50);color:var(--blue-600)}
+  .agent-info{padding:12px 20px;border-top:1px solid var(--gray-100);display:flex;align-items:center;gap:10px;font-size:13px}
+  .agent-avatar{width:28px;height:28px;border-radius:50%;background:var(--blue-50);color:var(--blue-600);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+  .agent-info-text{flex:1;min-width:0}
+  .agent-info-name{font-weight:600;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .agent-info-role{font-size:11px;color:var(--gray-400)}
+  .btn-logout{font-size:11px;color:var(--gray-400);cursor:pointer;border:none;background:none;font-family:var(--font);padding:4px 8px;border-radius:var(--radius-sm)}
+  .btn-logout:hover{color:var(--red-text);background:var(--red-bg)}
+
+  /* Main */
+  .main{flex:1;overflow-y:auto;padding:36px 40px}
+  .page{animation:fadeUp .3s ease}
+  .page.hidden{display:none}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .page-header{margin-bottom:32px}
+  .page-title{font-size:26px;font-weight:600;color:var(--blue-900);letter-spacing:-.03em;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .page-desc{font-size:14px;color:var(--gray-400)}
+
+  /* Scenario cards */
+  .practice-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px}
+  .practice-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:16px 18px;cursor:pointer;transition:border-color .15s,box-shadow .15s;display:flex;flex-direction:column;gap:8px}
+  .practice-card:hover{border-color:var(--blue-200);box-shadow:0 2px 12px rgba(24,95,165,.07)}
+  .pc-top{display:flex;align-items:center;gap:8px}
+  .pc-diff-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .pc-diff-dot.easy{background:var(--green-text)}.pc-diff-dot.medium{background:#D97706}.pc-diff-dot.hard{background:var(--red-text)}
+  .pc-cat{font-size:11px;color:var(--gray-400);font-weight:500}
+  .pc-title{font-size:13.5px;font-weight:500;color:var(--gray-900);line-height:1.4}
+  .pc-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:2px}
+  .pc-diff-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px}
+  .pc-diff-badge.easy{background:var(--green-bg);color:var(--green-text)}
+  .pc-diff-badge.medium{background:var(--amber-bg);color:var(--amber-text)}
+  .pc-diff-badge.hard{background:var(--red-bg);color:var(--red-text)}
+
+  /* Chat page */
+  #page-chat{display:flex;flex-direction:column;height:100%;padding:0;overflow:hidden}
+  .chat-topbar{flex-shrink:0;padding:16px 28px;background:#fff;border-bottom:1px solid var(--gray-200);display:flex;align-items:center;gap:14px}
+  .chat-back{width:30px;height:30px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gray-600);flex-shrink:0;transition:all .15s}
+  .chat-back:hover{border-color:var(--blue-200);color:var(--blue-600);background:var(--blue-50)}
+  .chat-scenario-info{flex:1}
+  .chat-scenario-title{font-size:14px;font-weight:600;color:var(--gray-900)}
+  .chat-scenario-meta{display:flex;align-items:center;gap:8px;margin-top:2px}
+  .chat-meta-badge{font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px}
+  .chat-meta-badge.easy{background:var(--green-bg);color:var(--green-text)}
+  .chat-meta-badge.medium{background:var(--amber-bg);color:var(--amber-text)}
+  .chat-meta-badge.hard{background:var(--red-bg);color:var(--red-text)}
+  .chat-meta-cat{font-size:11px;color:var(--gray-400)}
+  .chat-topbar-actions{display:flex;gap:8px;flex-shrink:0}
+  .btn-hint,.btn-end{padding:7px 14px;border-radius:var(--radius-sm);font-family:var(--font);font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+  .btn-hint{border:1px solid var(--gray-200);background:#fff;color:var(--gray-600)}
+  .btn-hint:hover{border-color:var(--blue-200);color:var(--blue-600);background:var(--blue-50)}
+  .btn-end{border:none;background:var(--blue-600);color:#fff;font-weight:600}
+  .btn-end:hover{background:var(--blue-800)}
+
+  .chat-context-bar{flex-shrink:0;background:var(--blue-50);border-bottom:1px solid var(--blue-100);padding:10px 28px;display:flex;align-items:flex-start;gap:10px}
+  .chat-context-bar.hidden{display:none}
+  .ctx-icon{font-size:14px;flex-shrink:0}.ctx-text{font-size:12px;color:var(--blue-800);line-height:1.5}.ctx-text strong{font-weight:600}
+
+  .chat-body{flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:4px;background:var(--gray-50)}
+  .chat-msg{display:flex;gap:10px;max-width:75%;margin-bottom:8px}
+  .chat-msg.bot{align-self:flex-start}.chat-msg.cs{align-self:flex-end;flex-direction:row-reverse}
+  .msg-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;margin-top:2px}
+  .msg-avatar.bot-av{background:var(--red-bg);color:var(--red-text)}.msg-avatar.cs-av{background:var(--blue-50);color:var(--blue-600)}
+  .msg-body{display:flex;flex-direction:column;gap:3px}
+  .msg-name{font-size:11px;color:var(--gray-400);font-weight:500}
+  .chat-msg.cs .msg-name{text-align:right}
+  .msg-bubble{padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.55;color:var(--gray-900)}
+  .chat-msg.bot .msg-bubble{background:#fff;border:1px solid var(--gray-200);border-top-left-radius:4px}
+  .chat-msg.cs .msg-bubble{background:var(--blue-600);color:#fff;border-top-right-radius:4px}
+  .msg-time{font-size:11px;color:var(--gray-400)}.chat-msg.cs .msg-time{text-align:right}
+
+  .typing-indicator{display:flex;gap:10px;max-width:75%;margin-bottom:8px;align-self:flex-start}
+  .typing-indicator .msg-bubble{display:flex;align-items:center;gap:4px;padding:12px 14px}
+  .typing-indicator .msg-bubble span{width:6px;height:6px;border-radius:50%;background:var(--gray-400);animation:bounce 1.2s ease-in-out infinite}
+  .typing-indicator .msg-bubble span:nth-child(2){animation-delay:.2s}
+  .typing-indicator .msg-bubble span:nth-child(3){animation-delay:.4s}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+  .hint-panel{flex-shrink:0;background:#fff8e6;border-top:1px solid #fde8a0;padding:12px 28px;display:flex;align-items:flex-start;gap:10px;animation:fadeUp .25s ease}
+  .hint-panel.hidden{display:none}
+  .hint-title{font-size:11px;font-weight:600;color:#9A6B0C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+  .hint-text{font-size:13px;color:#7a5200;line-height:1.5}
+  .hint-close{font-size:16px;color:#c8a04a;cursor:pointer;padding:0 4px}
+  .hint-close:hover{color:#9A6B0C}
+
+  .chat-input-area{flex-shrink:0;padding:14px 28px 18px;background:#fff;border-top:1px solid var(--gray-200);display:flex;gap:10px;align-items:flex-end}
+  .chat-textarea{flex:1;min-height:42px;max-height:120px;padding:10px 14px;border:1px solid var(--gray-200);border-radius:var(--radius);font-family:var(--font);font-size:13.5px;color:var(--gray-900);background:var(--gray-50);outline:none;resize:none;line-height:1.5;transition:border-color .15s}
+  .chat-textarea:focus{border-color:var(--blue-400);box-shadow:0 0 0 3px rgba(55,138,221,.1);background:#fff}
+  .chat-textarea:disabled{background:var(--gray-100);color:var(--gray-400);cursor:not-allowed}
+  .btn-send{width:42px;height:42px;border-radius:var(--radius);border:none;background:var(--blue-600);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background .15s}
+  .btn-send:hover{background:var(--blue-800)}
+  .btn-send:disabled{background:var(--gray-200);cursor:not-allowed}
+  .btn-send svg{width:16px;height:16px;fill:#fff}
+
+  /* Score overlay */
+  .score-overlay{position:fixed;inset:0;z-index:200;background:rgba(4,44,83,.45);display:flex;align-items:center;justify-content:center;animation:overlayIn .2s ease}
+  .score-overlay.hidden{display:none}
+  @keyframes overlayIn{from{opacity:0}to{opacity:1}}
+  .score-modal{background:#fff;border-radius:16px;border:1px solid var(--gray-200);width:460px;max-width:94vw;padding:32px;animation:modalIn .22s ease;text-align:center;max-height:90vh;overflow-y:auto}
+  @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+  .score-emoji{font-size:44px;margin-bottom:12px}.score-headline{font-size:22px;font-weight:600;color:var(--blue-900);margin-bottom:4px}.score-sub{font-size:13px;color:var(--gray-400);margin-bottom:24px}
+  .score-big{font-size:56px;font-weight:600;color:var(--blue-600);letter-spacing:-.04em;line-height:1;margin-bottom:6px;font-family:var(--font-mono)}
+  .score-label{font-size:12px;color:var(--gray-400);margin-bottom:24px}
+  .score-breakdown{display:flex;flex-direction:column;gap:8px;margin-bottom:28px;text-align:left}
+  .score-row{display:flex;align-items:center;gap:10px;font-size:13px}
+  .score-row-name{flex:1;color:var(--gray-600)}.score-row-val{font-weight:600;font-family:var(--font-mono);font-size:12px}
+  .score-row-val.good{color:var(--green-text)}.score-row-val.warn{color:var(--amber-text)}.score-row-val.bad{color:var(--red-text)}
+  .score-actions{display:flex;gap:10px}
+  .score-btn-retry{flex:1;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;font-family:var(--font);font-size:13px;font-weight:500;color:var(--gray-600);cursor:pointer;transition:all .15s}
+  .score-btn-retry:hover{border-color:var(--blue-200);color:var(--blue-600);background:var(--blue-50)}
+  .score-btn-home{flex:1;padding:10px;border-radius:var(--radius-sm);border:none;background:var(--blue-600);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
+  .score-btn-home:hover{background:var(--blue-800)}
+
+  /* Dashboard */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+  .stat-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:18px 20px;transition:border-color .15s}
+  .stat-card:hover{border-color:var(--blue-200)}
+  .stat-label{font-size:11px;font-weight:600;color:var(--gray-400);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+  .stat-value{font-size:28px;font-weight:600;color:var(--blue-900);letter-spacing:-.03em;line-height:1;margin-bottom:4px}
+  .stat-sub{font-size:12px;color:var(--gray-400)}
+  .dash-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .dash-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:20px}
+  .dash-card-title{font-size:13px;font-weight:600;color:var(--gray-900);margin-bottom:16px}
+  .score-bar-list{display:flex;flex-direction:column;gap:12px}
+  .score-bar-item{display:flex;flex-direction:column;gap:5px}
+  .score-bar-meta{display:flex;justify-content:space-between;font-size:12px}
+  .score-bar-name{color:var(--gray-600)}.score-bar-val{color:var(--blue-800);font-weight:600;font-family:var(--font-mono)}
+  .score-bar-track{height:6px;background:var(--gray-100);border-radius:4px;overflow:hidden}
+  .score-bar-fill{height:100%;border-radius:4px;background:var(--blue-400);transition:width .6s ease}
+  .score-bar-fill.good{background:var(--green-text)}.score-bar-fill.warn{background:#D97706}.score-bar-fill.bad{background:var(--red-text)}
+  .history-list{display:flex;flex-direction:column}
+  .history-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
+  .history-item:last-child{border-bottom:none}
+  .history-diff{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .history-diff.easy{background:var(--green-text)}.history-diff.medium{background:#D97706}.history-diff.hard{background:var(--red-text)}
+  .history-title{flex:1;color:var(--gray-600)}
+  .history-score{font-family:var(--font-mono);font-size:13px;font-weight:500;min-width:36px;text-align:right}
+  .history-score.s-high{color:var(--green-text)}.history-score.s-mid{color:#D97706}.history-score.s-low{color:var(--red-text)}
+  .history-time{font-size:11px;color:var(--gray-400);min-width:60px;text-align:right}
+
+  /* Scrollbar */
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--gray-200);border-radius:10px}
+
+  /* Loading */
+  .loading-dots{display:inline-flex;gap:4px;align-items:center}
+  .loading-dots span{width:6px;height:6px;border-radius:50%;background:var(--gray-400);animation:bounce 1.2s ease-in-out infinite}
+  .loading-dots span:nth-child(2){animation-delay:.2s}
+  .loading-dots span:nth-child(3){animation-delay:.4s}
+</style>
+</head>
+<body>
+
+<!-- Login overlay -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <div style="font-size:36px;margin-bottom:12px">💬</div>
+    <h1>CS Training Simulator</h1>
+    <p>Practice handling customer conversations with AI</p>
+    <div class="field-group">
+      <label class="field-label">Your name</label>
+      <input class="field-input" id="login-name" type="text" placeholder="e.g. Linh" autofocus />
+    </div>
+    <div class="login-role-row">
+      <button class="login-role-btn active" onclick="setLoginRole('agent',this)">CS Agent</button>
+      <button class="login-role-btn" onclick="setLoginRole('leader',this)">Leader</button>
+    </div>
+    <div class="login-pw" id="login-pw">
+      <label class="field-label">Leader password</label>
+      <input class="field-input" id="login-password" type="password" placeholder="Enter password" />
+    </div>
+    <button class="login-btn" onclick="doLogin()">Login</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div class="app" id="app-container" style="display:none">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg></div>
+      <div style="flex:1"><div class="logo-text">Simulator</div><div class="logo-sub">CS Training</div></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="section-title">Session</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Guided Mode</span>
+        <div class="toggle" id="guided-toggle" onclick="toggleGuided()"></div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Difficulty</label>
+        <div class="difficulty-grid">
+          <button class="diff-btn easy active" onclick="setDiff('easy',this)">Easy</button>
+          <button class="diff-btn medium" onclick="setDiff('medium',this)">Medium</button>
+          <button class="diff-btn hard" onclick="setDiff('hard',this)">Hard</button>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Category</label>
+        <div class="select-wrap">
+          <select class="field-select" id="cat-select" onchange="filterScenarios()"></select>
+          <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="scenarios-count" id="sc-count"></div>
+      </div>
+    </div>
+
+    <div class="sidebar-actions">
+      <button class="btn-random" onclick="startRandom()">🎲 Random Scenario</button>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <nav class="sidebar-nav-bottom">
+      <div class="nav-item active" id="nav-practice" onclick="showPage('practice')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Practice
+      </div>
+      <div class="nav-item" id="nav-dashboard" onclick="showPage('dashboard')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+    </nav>
+
+    <div class="agent-info">
+      <div class="agent-avatar" id="agent-avatar">?</div>
+      <div class="agent-info-text">
+        <div class="agent-info-name" id="agent-display-name">—</div>
+        <div class="agent-info-role" id="agent-display-role">—</div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main" id="main-content">
+    <!-- Practice page -->
+    <div class="page" id="page-practice">
+      <div class="page-header">
+        <div class="page-title">💬 Practice</div>
+        <p class="page-desc">Choose a scenario below or hit Random to start practicing</p>
+      </div>
+      <div id="scenarios-grid" class="practice-grid"></div>
+    </div>
+
+    <!-- Dashboard page -->
+    <div class="page hidden" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">📊 Dashboard</div>
+        <p class="page-desc" id="dash-desc">Track your progress and improvement</p>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Sessions</div><div class="stat-value" id="stat-sessions">0</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Score</div><div class="stat-value" id="stat-avg">—</div></div>
+        <div class="stat-card"><div class="stat-label">Best Score</div><div class="stat-value" id="stat-best">—</div></div>
+        <div class="stat-card"><div class="stat-label">Avg Turns</div><div class="stat-value" id="stat-turns">—</div></div>
+      </div>
+      <div class="dash-row">
+        <div class="dash-card">
+          <div class="dash-card-title">Score by criteria</div>
+          <div class="score-bar-list" id="dash-score-bars"></div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-title">Recent sessions</div>
+          <div class="history-list" id="dash-history"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat page -->
+    <div class="page hidden" id="page-chat" style="display:none">
+      <div class="chat-topbar">
+        <div class="chat-back" onclick="exitChat()" title="Back">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L4.5 7 9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="chat-scenario-info">
+          <div class="chat-scenario-title" id="chat-title">—</div>
+          <div class="chat-scenario-meta">
+            <span class="chat-meta-badge" id="chat-diff-badge">—</span>
+            <span style="font-size:11px;color:var(--gray-300)">·</span>
+            <span class="chat-meta-cat" id="chat-cat-label">—</span>
+          </div>
+        </div>
+        <div class="chat-topbar-actions">
+          <button class="btn-hint" onclick="getHint()">💡 Hint</button>
+          <button class="btn-end" onclick="endSession()">📝 End & Score</button>
+        </div>
+      </div>
+      <div class="chat-context-bar hidden" id="chat-context-bar">
+        <div class="ctx-icon">📋</div>
+        <div class="ctx-text" id="chat-context-text"></div>
+      </div>
+      <div class="chat-body" id="chat-body"></div>
+      <div class="hint-panel hidden" id="hint-panel">
+        <div style="font-size:14px;flex-shrink:0">💡</div>
+        <div style="flex:1"><div class="hint-title">Hint</div><div class="hint-text" id="hint-text"></div></div>
+        <div class="hint-close" onclick="closeHint()">×</div>
+      </div>
+      <div class="chat-input-area">
+        <textarea class="chat-textarea" id="chat-input" placeholder="Type your reply as CS agent..." rows="1"
+          onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="btn-send" id="btn-send" onclick="sendMessage()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Score overlay -->
+<div class="score-overlay hidden" id="score-overlay">
+  <div class="score-modal">
+    <div class="score-emoji" id="score-emoji">🎉</div>
+    <div class="score-headline">Session Complete!</div>
+    <div class="score-sub" id="score-scenario-name"></div>
+    <div class="score-big" id="score-number">—</div>
+    <div class="score-label">Overall score (out of 10)</div>
+    <div class="score-breakdown" id="score-breakdown"></div>
+    <div class="score-actions">
+      <button class="score-btn-retry" onclick="retryScenario()">🔄 Retry</button>
+      <button class="score-btn-home" onclick="closeScore()">← Back to Practice</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+const STATE = {
+  user: null,        // {name, role}
+  scenarios: [],
+  difficulty: 'easy',
+  category: 'All',
+  guidedMode: true,
+  currentPage: 'practice',
+  // Chat session
+  sessionId: null,
+  sessionScenario: null,
+  sessionPersona: null,
+  guidedSteps: [],
+  guidedStep: 0,
+  turnCount: 0,
+  sending: false,
+  lastCustomerTime: null,
+};
+
+// ══════════════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════════════
+let loginRole = 'agent';
+
+function setLoginRole(role, btn) {
+  loginRole = role;
+  document.querySelectorAll('.login-role-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('login-pw').classList.toggle('show', role === 'leader');
+}
+
+async function doLogin() {
+  const name = document.getElementById('login-name').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+
+  if (!name) { errEl.textContent = 'Please enter your name'; errEl.style.display = 'block'; return; }
+
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name, role: loginRole, password}),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+
+    STATE.user = {name: data.name, role: data.role};
+    document.getElementById('login-overlay').classList.add('hidden');
+    document.getElementById('app-container').style.display = 'flex';
+    document.getElementById('agent-display-name').textContent = data.name;
+    document.getElementById('agent-display-role').textContent = data.role === 'leader' ? 'Leader' : 'CS Agent';
+    document.getElementById('agent-avatar').textContent = data.name[0].toUpperCase();
+    if (data.role === 'leader') document.getElementById('dash-desc').textContent = 'All agents\' results';
+
+    loadScenarios();
+  } catch(e) { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
+}
+
+function doLogout() {
+  STATE.user = null;
+  document.getElementById('login-overlay').classList.remove('hidden');
+  document.getElementById('app-container').style.display = 'none';
+  document.getElementById('login-name').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+// Enter key on login
+document.getElementById('login-name').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('login-password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// ══════════════════════════════════════════════
+//  SCENARIOS
+// ══════════════════════════════════════════════
+async function loadScenarios() {
+  try {
+    const res = await fetch('/api/scenarios?app=chatty');
+    STATE.scenarios = await res.json();
+    updateCategorySelect();
+    filterScenarios();
+  } catch(e) { console.error('Failed to load scenarios', e); }
+}
+
+function updateCategorySelect() {
+  const sel = document.getElementById('cat-select');
+  const cats = [...new Set(STATE.scenarios.filter(s => s.difficulty === STATE.difficulty).map(s => s.category))].sort();
+  sel.innerHTML = '<option value="All">All</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+function filterScenarios() {
+  STATE.category = document.getElementById('cat-select').value;
+  const filtered = STATE.scenarios.filter(s => {
+    if (s.difficulty !== STATE.difficulty) return false;
+    if (STATE.category !== 'All' && s.category !== STATE.category) return false;
+    return true;
+  });
+
+  document.getElementById('sc-count').textContent = `${filtered.length} scenarios`;
+
+  const grid = document.getElementById('scenarios-grid');
+  if (!filtered.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)">No scenarios for this filter</div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(s => `
+    <div class="practice-card" onclick="startScenario('${s.id}')">
+      <div class="pc-top">
+        <div class="pc-diff-dot ${s.difficulty}"></div>
+        <div class="pc-cat">${s.category}</div>
+      </div>
+      <div class="pc-title">${escHtml(s.opening_message.substring(0, 100))}${s.opening_message.length > 100 ? '...' : ''}</div>
+      <div class="pc-bottom">
+        <span class="pc-diff-badge ${s.difficulty}">${capitalize(s.difficulty)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setDiff(diff, btn) {
+  STATE.difficulty = diff;
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else document.querySelector(`.diff-btn.${diff}`).classList.add('active');
+  updateCategorySelect();
+  filterScenarios();
+}
+
+function toggleGuided() {
+  STATE.guidedMode = !STATE.guidedMode;
+  document.getElementById('guided-toggle').classList.toggle('off', !STATE.guidedMode);
+}
+
+// ══════════════════════════════════════════════
+//  CHAT SESSION
+// ══════════════════════════════════════════════
+async function startScenario(scenarioId) {
+  await startSession({scenario_id: scenarioId});
+}
+
+async function startRandom() {
+  await startSession({difficulty: STATE.difficulty});
+}
+
+async function startSession(params) {
+  try {
+    const res = await fetch('/api/session/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({app: 'chatty', ...params}),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error); return; }
+
+    STATE.sessionId = data.session_id;
+    STATE.sessionScenario = data.scenario;
+    STATE.sessionPersona = data.persona;
+    STATE.guidedSteps = data.guided_steps || [];
+    STATE.guidedStep = 0;
+    STATE.turnCount = 0;
+    STATE.lastCustomerTime = Date.now();
+
+    // Switch to chat view
+    showChatPage(data);
+
+    // Show opening message
+    addChatMessage('customer', data.opening_message);
+
+    // Show guided step
+    if (STATE.guidedMode && STATE.guidedSteps.length > 0) {
+      showGuidedStep(0);
+    }
+  } catch(e) { alert('Failed to start session: ' + e.message); }
+}
+
+function showChatPage(data) {
+  const s = data.scenario;
+  document.getElementById('chat-title').textContent = s.opening_message.substring(0, 60) + (s.opening_message.length > 60 ? '...' : '');
+  const badge = document.getElementById('chat-diff-badge');
+  badge.textContent = capitalize(s.difficulty);
+  badge.className = 'chat-meta-badge ' + s.difficulty;
+  document.getElementById('chat-cat-label').textContent = s.category;
+  document.getElementById('chat-body').innerHTML = '';
+  document.getElementById('hint-panel').classList.add('hidden');
+  document.getElementById('chat-input').value = '';
+  document.getElementById('chat-input').disabled = false;
+  document.getElementById('btn-send').disabled = false;
+
+  // Show context bar for guided mode
+  const ctxBar = document.getElementById('chat-context-bar');
+  if (STATE.guidedMode) {
+    ctxBar.classList.remove('hidden');
+    document.getElementById('chat-context-text').innerHTML = `<strong>Guided Mode ON</strong> — Follow the 8-step livechat process. Current step shown above the chat.`;
+  } else {
+    ctxBar.classList.add('hidden');
+  }
+
+  // Switch pages
+  document.getElementById('page-practice').classList.add('hidden');
+  document.getElementById('page-practice').style.display = 'none';
+  document.getElementById('page-dashboard').classList.add('hidden');
+  document.getElementById('page-dashboard').style.display = 'none';
+  document.getElementById('page-chat').classList.remove('hidden');
+  document.getElementById('page-chat').style.display = 'flex';
+  document.getElementById('main-content').style.padding = '0';
+  document.getElementById('main-content').style.overflow = 'hidden';
+}
+
+function exitChat() {
+  document.getElementById('page-chat').classList.add('hidden');
+  document.getElementById('page-chat').style.display = 'none';
+  document.getElementById('main-content').style.padding = '36px 40px';
+  document.getElementById('main-content').style.overflow = 'auto';
+  showPage(STATE.currentPage);
+}
+
+function addChatMessage(role, text) {
+  const body = document.getElementById('chat-body');
+  const isCustomer = role === 'customer';
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  const msgDiv = document.createElement('div');
+  msgDiv.className = `chat-msg ${isCustomer ? 'bot' : 'cs'}`;
+  msgDiv.innerHTML = `
+    <div class="msg-avatar ${isCustomer ? 'bot-av' : 'cs-av'}">${isCustomer ? '👤' : (STATE.user?.name?.[0]?.toUpperCase() || 'A')}</div>
+    <div class="msg-body">
+      <div class="msg-name">${isCustomer ? (STATE.sessionPersona?.name || 'Customer') : STATE.user?.name || 'You'}</div>
+      <div class="msg-bubble">${escHtml(text)}</div>
+      <div class="msg-time">${timeStr}</div>
+    </div>
+  `;
+  body.appendChild(msgDiv);
+  body.scrollTop = body.scrollHeight;
+}
+
+function showTypingIndicator() {
+  const body = document.getElementById('chat-body');
+  const div = document.createElement('div');
+  div.className = 'typing-indicator';
+  div.id = 'typing-indicator';
+  div.innerHTML = `
+    <div class="msg-avatar bot-av">👤</div>
+    <div class="msg-body"><div class="msg-bubble" style="background:#fff;border:1px solid var(--gray-200);border-top-left-radius:4px"><span></span><span></span><span></span></div></div>
+  `;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const el = document.getElementById('typing-indicator');
+  if (el) el.remove();
+}
+
+function showGuidedStep(stepIdx) {
+  if (!STATE.guidedMode || stepIdx >= STATE.guidedSteps.length) return;
+  const step = STATE.guidedSteps[stepIdx];
+  const ctxBar = document.getElementById('chat-context-bar');
+  ctxBar.classList.remove('hidden');
+  document.getElementById('chat-context-text').innerHTML = `<strong>${step.label}</strong> — ${escHtml(step.tip)}`;
+}
+
+async function sendMessage() {
+  if (STATE.sending) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !STATE.sessionId) return;
+
+  STATE.sending = true;
+  input.value = '';
+  input.style.height = '42px';
+  addChatMessage('agent', text);
+  showTypingIndicator();
+  input.disabled = true;
+  document.getElementById('btn-send').disabled = true;
+
+  try {
+    const res = await fetch('/api/session/message', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: STATE.sessionId, message: text}),
+    });
+    const data = await res.json();
+    removeTypingIndicator();
+
+    if (res.ok) {
+      addChatMessage('customer', data.customer_reply);
+      STATE.turnCount = data.turn_count;
+      STATE.lastCustomerTime = Date.now();
+      if (STATE.guidedMode) showGuidedStep(data.guided_step);
+    } else {
+      addChatMessage('customer', '(Error getting response)');
+    }
+  } catch(e) {
+    removeTypingIndicator();
+    addChatMessage('customer', '(Connection error)');
+  }
+
+  STATE.sending = false;
+  input.disabled = false;
+  document.getElementById('btn-send').disabled = false;
+  input.focus();
+}
+
+function handleChatKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function autoResize(el) {
+  el.style.height = '42px';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+async function endSession() {
+  if (!STATE.sessionId) return;
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('chat-input').disabled = true;
+
+  // Show loading in score overlay
+  const overlay = document.getElementById('score-overlay');
+  overlay.classList.remove('hidden');
+  document.getElementById('score-emoji').textContent = '⏳';
+  document.getElementById('score-number').textContent = '...';
+  document.getElementById('score-breakdown').innerHTML = '<div style="text-align:center;color:var(--gray-400)">Evaluating your performance<br><div class="loading-dots"><span></span><span></span><span></span></div></div>';
+
+  try {
+    const res = await fetch('/api/session/end', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: STATE.sessionId, agent_name: STATE.user?.name}),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      showScoreResult(data);
+    } else {
+      document.getElementById('score-number').textContent = '?';
+      document.getElementById('score-breakdown').innerHTML = '<div style="color:var(--red-text)">Grading failed</div>';
+    }
+  } catch(e) {
+    document.getElementById('score-number').textContent = '?';
+    document.getElementById('score-breakdown').innerHTML = '<div style="color:var(--red-text)">Connection error</div>';
+  }
+}
+
+function showScoreResult(data) {
+  const overall = data.overall || 0;
+  let emoji = '🎉';
+  if (overall >= 9) emoji = '🌟';
+  else if (overall >= 7) emoji = '🎉';
+  else if (overall >= 5) emoji = '💪';
+  else emoji = '📚';
+
+  document.getElementById('score-emoji').textContent = emoji;
+  document.getElementById('score-number').textContent = overall.toFixed(1);
+  document.getElementById('score-scenario-name').textContent =
+    `${capitalize(STATE.sessionScenario?.difficulty || '')} · ${STATE.sessionScenario?.category || ''} · ${STATE.turnCount} turns`;
+
+  const labels = {
+    greeting:'Greeting', empathy:'Empathy', probing:'Probing', expectation:'Expectation',
+    troubleshoot:'Troubleshoot', followup:'Follow-up', achieve_more:'Achieve More',
+    farewell:'Farewell', tone:'Tone', quality:'Quality'
+  };
+
+  const breakdown = document.getElementById('score-breakdown');
+  breakdown.innerHTML = Object.entries(data.scores || {}).map(([key, val]) => {
+    let cls = 'good';
+    if (val < 5) cls = 'bad';
+    else if (val < 7) cls = 'warn';
+    return `<div class="score-row">
+      <span class="score-row-name">${labels[key] || key}</span>
+      <span class="score-row-val ${cls}">${val}/10</span>
+    </div>`;
+  }).join('');
+}
+
+function retryScenario() {
+  document.getElementById('score-overlay').classList.add('hidden');
+  if (STATE.sessionScenario) {
+    startScenario(STATE.sessionScenario.id);
+  }
+}
+
+function closeScore() {
+  document.getElementById('score-overlay').classList.add('hidden');
+  STATE.sessionId = null;
+  exitChat();
+}
+
+async function getHint() {
+  if (!STATE.sessionId) return;
+  try {
+    const res = await fetch('/api/session/hint', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({session_id: STATE.sessionId}),
+    });
+    const data = await res.json();
+    document.getElementById('hint-text').textContent = data.hint;
+    document.getElementById('hint-panel').classList.remove('hidden');
+  } catch(e) {}
+}
+
+function closeHint() {
+  document.getElementById('hint-panel').classList.add('hidden');
+}
+
+// ══════════════════════════════════════════════
+//  PAGES
+// ══════════════════════════════════════════════
+function showPage(page) {
+  STATE.currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`nav-${page}`).classList.add('active');
+
+  document.getElementById('page-practice').classList.toggle('hidden', page !== 'practice');
+  document.getElementById('page-practice').style.display = page === 'practice' ? '' : 'none';
+  document.getElementById('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
+  document.getElementById('page-dashboard').style.display = page === 'dashboard' ? '' : 'none';
+  document.getElementById('page-chat').style.display = 'none';
+  document.getElementById('main-content').style.padding = '36px 40px';
+  document.getElementById('main-content').style.overflow = 'auto';
+
+  if (page === 'dashboard') loadDashboard();
+}
+
+// ══════════════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const url = STATE.user?.role === 'leader'
+      ? '/api/results'
+      : `/api/results?agent=${encodeURIComponent(STATE.user?.name || '')}`;
+    const res = await fetch(url);
+    const results = await res.json();
+    if (Array.isArray(results)) renderDashboard(results);
+  } catch(e) { console.error('Dashboard load error', e); }
+}
+
+function renderDashboard(results) {
+  const scored = results.filter(r => r.overall > 0);
+  const total = results.length;
+  const avgScore = scored.length ? (scored.reduce((s,r) => s + r.overall, 0) / scored.length).toFixed(1) : '—';
+  const bestScore = scored.length ? Math.max(...scored.map(r => r.overall)).toFixed(1) : '—';
+  const avgTurns = total ? Math.round(results.reduce((s,r) => s + (r.turns||0), 0) / total) : '—';
+
+  document.getElementById('stat-sessions').textContent = total;
+  document.getElementById('stat-avg').textContent = avgScore;
+  document.getElementById('stat-best').textContent = bestScore;
+  document.getElementById('stat-turns').textContent = avgTurns;
+
+  // Score bars
+  const criteria = ['greeting','empathy','probing','expectation','troubleshoot','followup','achieve_more','farewell','tone','quality'];
+  const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',tone:'Tone',quality:'Quality'};
+
+  const barsEl = document.getElementById('dash-score-bars');
+  if (!scored.length) { barsEl.innerHTML = '<div style="color:var(--gray-400);font-size:13px">No scored sessions yet</div>'; }
+  else {
+    barsEl.innerHTML = criteria.map(key => {
+      const vals = scored.map(r => r.scores?.[key]).filter(v => v != null);
+      const avg = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+      const pct = avg * 10;
+      let cls = 'good'; if(avg<5) cls='bad'; else if(avg<7) cls='warn';
+      return `<div class="score-bar-item">
+        <div class="score-bar-meta"><span class="score-bar-name">${labels[key]||key}</span><span class="score-bar-val">${avg.toFixed(1)}</span></div>
+        <div class="score-bar-track"><div class="score-bar-fill ${cls}" style="width:${pct}%"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // History
+  const histEl = document.getElementById('dash-history');
+  const recent = results.slice(0, 8);
+  if (!recent.length) { histEl.innerHTML = '<div style="color:var(--gray-400);font-size:13px;padding:10px 0">No sessions yet</div>'; }
+  else {
+    histEl.innerHTML = recent.map(r => {
+      const score = r.overall || 0;
+      let sCls = 's-high'; if(score<5) sCls='s-low'; else if(score<7) sCls='s-mid';
+      const ts = r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '';
+      return `<div class="history-item">
+        <div class="history-diff ${r.difficulty}"></div>
+        <div class="history-title">${r.agent || 'Anonymous'} · ${r.category || r.intent}</div>
+        <div class="history-score ${sCls}">${score.toFixed(1)}</div>
+        <div class="history-time">${ts}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ══════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════
+function escHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+</script>
+</body>
+</html>

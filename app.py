@@ -1,0 +1,602 @@
+"""
+CS Training Simulator — Flask Backend
+Serves the HTML frontend and provides API endpoints for:
+- Scenario listing
+- Customer simulation (Groq LLM)
+- Session grading
+- Results persistence (Supabase)
+"""
+
+import os
+import json
+import random
+import re
+import time
+import yaml
+import datetime
+from pathlib import Path
+from flask import Flask, render_template, request, jsonify, session
+from groq import Groq
+from supabase import create_client
+
+# --- App ---
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "cs-simulator-secret-2024")
+
+# --- Config ---
+DATA_DIR = Path(__file__).resolve().parent / "data"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+LEADER_PASSWORD = os.environ.get("LEADER_PASSWORD", "avada2024")
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+# --- Clients ---
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+
+# --- Personas by difficulty ---
+PERSONAS_BY_DIFFICULTY = {
+    "easy": [
+        {"name": "Friendly Newbie", "tone": "polite, a bit confused, asks basic questions, appreciative when helped",
+         "patience": "high", "tech_level": "low", "emoji_use": "sometimes"},
+        {"name": "Detail-Oriented Merchant", "tone": "asks many follow-up questions, wants to understand why not just how, methodical",
+         "patience": "high", "tech_level": "high", "emoji_use": "no"},
+    ],
+    "medium": [
+        {"name": "Confused Non-Tech Merchant", "tone": "lost, doesn't understand technical terms, needs step-by-step hand-holding",
+         "patience": "medium", "tech_level": "very low", "emoji_use": "sometimes"},
+        {"name": "Price-Sensitive Merchant", "tone": "always asks about cost, compares with competitors, wants discounts",
+         "patience": "medium", "tech_level": "medium", "emoji_use": "rarely"},
+        {"name": "Non-Native English Speaker", "tone": "simple English, occasional grammar mistakes, may mix languages",
+         "patience": "high", "tech_level": "low", "emoji_use": "often"},
+    ],
+    "hard": [
+        {"name": "Frustrated Merchant", "tone": "annoyed, short messages, expects quick resolution, may threaten bad review",
+         "patience": "low", "tech_level": "medium", "emoji_use": "rarely"},
+        {"name": "Angry Complainer", "tone": "very upset, uses caps sometimes, blames the app, mentions losing money",
+         "patience": "very low", "tech_level": "medium", "emoji_use": "no"},
+        {"name": "Impatient Business Owner", "tone": "busy, wants instant answers, no small talk, short direct messages",
+         "patience": "low", "tech_level": "high", "emoji_use": "no"},
+    ],
+}
+
+INTENT_DIFFICULTY = {
+    "howto": "easy", "presales": "easy", "integration": "easy",
+    "bug_report": "medium", "billing": "medium", "feature_request": "medium", "common_issue": "medium",
+    "complaint": "hard", "out_of_scope": "hard", "ambiguous": "hard", "multi_intent": "hard",
+}
+
+INTENT_CATEGORY = {
+    "howto": "How-to", "presales": "Pre-sales", "integration": "Integration",
+    "bug_report": "Bug Report", "billing": "Billing", "feature_request": "Feature Request",
+    "complaint": "Complaint", "out_of_scope": "Edge Case", "common_issue": "Common Issue",
+    "ambiguous": "Edge Case", "multi_intent": "Edge Case",
+}
+
+INTENT_HINTS = {
+    "howto": "Guide them step by step. Use specific navigation paths.",
+    "bug_report": "Ask for details first (store URL, screenshots). Then troubleshoot systematically.",
+    "billing": "Understand the reason. Never approve refunds yourself — escalate to CSL.",
+    "complaint": "Show empathy first! Acknowledge their frustration before troubleshooting.",
+    "feature_request": "Acknowledge the request, log it, but don't promise it will be built.",
+    "presales": "Highlight relevant features and plan options. Offer a demo call.",
+    "common_issue": "Check the common issues guide for this topic.",
+    "integration": "Confirm the integration exists, guide through setup steps.",
+}
+
+LIVECHAT_STEPS = [
+    {"key": "greeting", "label": "Step 1: Greeting",
+     "tip": 'Greet the customer and introduce yourself by name.'},
+    {"key": "empathy", "label": "Step 2: Show Empathy",
+     "tip": "Acknowledge the customer's situation before jumping to solutions."},
+    {"key": "probing", "label": "Step 3: Probing",
+     "tip": "Ask specific questions to understand the root issue. Don't assume."},
+    {"key": "expectation", "label": "Step 4: Set Expectation",
+     "tip": "Tell the customer what you'll do next and how long it might take."},
+    {"key": "troubleshoot", "label": "Step 5: Troubleshoot",
+     "tip": "Provide clear, step-by-step solution. Use screenshots/links if needed."},
+    {"key": "followup", "label": "Step 6: Follow Up",
+     "tip": "Confirm the issue is resolved. Ask the customer to verify."},
+    {"key": "achieve_more", "label": "Step 7: Achieve More",
+     "tip": "Offer additional help or suggest useful features proactively."},
+    {"key": "farewell", "label": "Step 8: Farewell & Review",
+     "tip": "Thank the customer and ask for a review. This step is mandatory!"},
+]
+
+
+# --- Load scenarios ---
+def load_scenarios(app_name: str = "chatty") -> list[dict]:
+    scenarios = []
+    app_dir = DATA_DIR / app_name
+
+    # From test-cases.yaml
+    test_file = app_dir / "eval" / "test-cases.yaml"
+    if test_file.exists():
+        with open(test_file, encoding="utf-8") as f:
+            cases = yaml.safe_load(f) or []
+        for c in cases:
+            intent = c.get("intent", "general")
+            scenarios.append({
+                "id": c.get("id", "unknown"),
+                "intent": intent,
+                "opening_message": c.get("input", ""),
+                "tags": c.get("tags", []),
+                "source": "test-cases",
+                "difficulty": INTENT_DIFFICULTY.get(intent, "medium"),
+                "category": INTENT_CATEGORY.get(intent, "Other"),
+            })
+
+    # From common-issues/*.md
+    issues_dir = app_dir / "common-issues"
+    if issues_dir.exists():
+        for md_file in sorted(issues_dir.glob("*.md")):
+            content = md_file.read_text(encoding="utf-8")
+            blocks = content.split("---")
+            for block in blocks:
+                lines = block.strip().split("\n")
+                questions = []
+                answer_lines = []
+                in_answer = False
+                for line in lines:
+                    if line.startswith("Q: "):
+                        questions.append(line[3:].strip())
+                        in_answer = False
+                    elif line.startswith("A: "):
+                        answer_lines.append(line[3:].strip())
+                        in_answer = True
+                    elif in_answer:
+                        answer_lines.append(line)
+                if questions:
+                    scenarios.append({
+                        "id": md_file.stem,
+                        "intent": "common_issue",
+                        "opening_message": random.choice(questions),
+                        "tags": [md_file.stem],
+                        "source": f"common-issues/{md_file.name}",
+                        "reference_answer": "\n".join(answer_lines),
+                        "difficulty": "medium",
+                        "category": "Common Issue",
+                    })
+
+    return scenarios
+
+
+def load_livechat_process() -> str:
+    lc_file = DATA_DIR / "shared" / "livechat-process.md"
+    if lc_file.exists():
+        return lc_file.read_text(encoding="utf-8")
+    return ""
+
+
+# --- LLM Prompts ---
+def build_customer_prompt(scenario: dict, persona: dict) -> str:
+    reference = scenario.get("reference_answer", "")
+    ref_section = ""
+    if reference:
+        ref_section = f"\n## Reference (what a good CS agent should do):\n{reference}\n"
+
+    return f"""You are a simulated Shopify merchant contacting support via live chat.
+You are role-playing as a customer for CS training purposes.
+
+## Your Persona
+- Type: {persona['name']}
+- Tone: {persona['tone']}
+- Patience level: {persona['patience']}
+- Tech knowledge: {persona['tech_level']}
+- Emoji usage: {persona['emoji_use']}
+
+## Your Scenario
+- Issue/Question: {scenario['opening_message']}
+- Intent type: {scenario['intent']}
+- Category: {', '.join(scenario.get('tags', []))}
+
+## Your Store Context (make up realistic details as needed)
+- You run a Shopify store (pick a realistic niche)
+- You may or may not know your current plan
+- You may have 50-500 products
+{ref_section}
+## Rules
+1. Stay in character throughout.
+2. Start with your opening message about your issue. Rephrase it naturally.
+3. React realistically to the CS agent's responses.
+4. After 3-5 exchanges where the agent hasn't addressed your issue, escalate frustration.
+5. Keep messages short (1-3 sentences). This is live chat, not email.
+6. Do NOT reveal you are a bot.
+7. Do NOT solve the issue yourself.
+"""
+
+
+def build_grading_prompt(livechat_process: str) -> str:
+    return f"""You are a CS Training Evaluator for Avada Support team.
+
+Evaluate the CS agent's performance in this practice live chat session.
+
+## Grading Criteria (8-step live chat process):
+
+{livechat_process}
+
+## Scoring (0-10 for each):
+
+1. **Greeting** (0-10): Did they greet properly and introduce themselves?
+2. **Empathy** (0-10): Did they acknowledge the customer's situation?
+3. **Probing** (0-10): Did they ask good questions to understand the root issue?
+4. **Set Expectation** (0-10): Did they inform about next steps / handling time?
+5. **Troubleshoot** (0-10): Was the solution correct, clear, and actionable?
+6. **Follow-up** (0-10): Did they confirm resolution?
+7. **Achieve More** (0-10): Did they offer additional help?
+8. **Farewell & Review** (0-10): Did they thank and ask for review?
+9. **Tone & Professionalism** (0-10): Friendly, professional, appropriate?
+10. **Response Quality** (0-10): Clear, concise, accurate?
+
+## IMPORTANT: Output format
+At the END of your evaluation, add this exact line:
+SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, tone=X, quality=X
+
+Also provide 3 specific, actionable tips for improvement.
+Overall: 9-10 Excellent, 7-8 Good, 5-6 Needs Work, <5 Re-train.
+"""
+
+
+def parse_scores(grading_text: str) -> dict:
+    scores = {}
+    match = re.search(r"SCORES:\s*(.+)", grading_text)
+    if match:
+        for pair in re.findall(r"(\w+)\s*=\s*(\d+(?:\.\d+)?)", match.group(1)):
+            scores[pair[0]] = float(pair[1])
+    else:
+        for m in re.finditer(r"\*?\*?(\w[\w\s&]*?)\*?\*?\s*[\(:]?\s*(\d+(?:\.\d+)?)\s*/?\s*10", grading_text):
+            key = m.group(1).strip().lower().replace(" ", "_").replace("&", "and")
+            scores[key] = float(m.group(2))
+    return scores
+
+
+# --- Cache scenarios ---
+_scenarios_cache = {}
+
+def get_scenarios(app_name: str = "chatty") -> list[dict]:
+    if app_name not in _scenarios_cache:
+        _scenarios_cache[app_name] = load_scenarios(app_name)
+    return _scenarios_cache[app_name]
+
+
+# --- Routes ---
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.json
+    name = data.get("name", "").strip()
+    role = data.get("role", "agent")
+    password = data.get("password", "")
+
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    if role == "leader" and password != LEADER_PASSWORD:
+        return jsonify({"error": "Wrong password"}), 403
+
+    session["agent_name"] = name
+    session["user_role"] = role
+    return jsonify({"ok": True, "name": name, "role": role})
+
+
+@app.route("/api/scenarios")
+def api_scenarios():
+    app_name = request.args.get("app", "chatty")
+    scenarios = get_scenarios(app_name)
+    # Return without reference_answer (keep it server-side)
+    safe = []
+    for s in scenarios:
+        safe.append({
+            "id": s["id"],
+            "intent": s["intent"],
+            "opening_message": s["opening_message"],
+            "tags": s.get("tags", []),
+            "difficulty": s.get("difficulty", "medium"),
+            "category": s.get("category", "Other"),
+        })
+    return jsonify(safe)
+
+
+@app.route("/api/session/start", methods=["POST"])
+def api_start_session():
+    """Start a new chat session. Returns opening customer message."""
+    data = request.json
+    app_name = data.get("app", "chatty")
+    scenario_id = data.get("scenario_id")
+    difficulty = data.get("difficulty", "medium")
+
+    scenarios = get_scenarios(app_name)
+
+    # Find scenario
+    if scenario_id:
+        scenario = next((s for s in scenarios if s["id"] == scenario_id), None)
+        if not scenario:
+            return jsonify({"error": "Scenario not found"}), 404
+    else:
+        # Random from difficulty
+        filtered = [s for s in scenarios if s.get("difficulty") == difficulty]
+        if not filtered:
+            filtered = scenarios
+        scenario = random.choice(filtered)
+
+    # Pick persona
+    diff_key = scenario.get("difficulty", "medium")
+    personas = PERSONAS_BY_DIFFICULTY.get(diff_key, PERSONAS_BY_DIFFICULTY["medium"])
+    persona = random.choice(personas)
+
+    # Build customer prompt
+    customer_prompt = build_customer_prompt(scenario, persona)
+
+    # Get opening message from LLM
+    opening = scenario["opening_message"]
+    if groq_client:
+        try:
+            response = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": customer_prompt},
+                    {"role": "user", "content": "Start the conversation. Send your opening message as the customer. Keep it short (1-2 sentences)."},
+                ],
+                temperature=0.8,
+                max_tokens=256,
+            )
+            opening = response.choices[0].message.content or opening
+        except Exception:
+            pass
+
+    # Store session data server-side
+    session_id = f"{int(time.time())}_{random.randint(1000,9999)}"
+    session[f"sess_{session_id}"] = {
+        "scenario": scenario,
+        "persona": persona,
+        "customer_prompt": customer_prompt,
+        "history": [{"role": "assistant", "content": opening}],
+        "turn_count": 0,
+        "started_at": time.time(),
+    }
+
+    return jsonify({
+        "session_id": session_id,
+        "opening_message": opening,
+        "scenario": {
+            "id": scenario["id"],
+            "intent": scenario["intent"],
+            "difficulty": scenario.get("difficulty", "medium"),
+            "category": scenario.get("category", "Other"),
+            "opening_message": scenario["opening_message"],
+        },
+        "persona": {"name": persona["name"]},
+        "guided_steps": LIVECHAT_STEPS,
+    })
+
+
+@app.route("/api/session/message", methods=["POST"])
+def api_send_message():
+    """Send agent message, get customer reply."""
+    data = request.json
+    session_id = data.get("session_id")
+    agent_message = data.get("message", "").strip()
+
+    sess_key = f"sess_{session_id}"
+    sess = session.get(sess_key)
+    if not sess:
+        return jsonify({"error": "Session not found"}), 404
+    if not agent_message:
+        return jsonify({"error": "Empty message"}), 400
+
+    # Update history
+    sess["history"].append({"role": "user", "content": agent_message})
+    sess["turn_count"] += 1
+
+    # Get customer response
+    customer_reply = "Sorry, can you say that again?"
+    if groq_client:
+        try:
+            turn_hint = ""
+            if sess["turn_count"] >= 8:
+                turn_hint = "\n(The conversation has been going for a while. If the issue seems resolved, start wrapping up.)"
+
+            messages = [{"role": "system", "content": sess["customer_prompt"] + turn_hint}]
+            messages.extend(sess["history"])
+
+            response = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=256,
+            )
+            customer_reply = response.choices[0].message.content or customer_reply
+        except Exception as e:
+            customer_reply = f"(Error: {e})"
+
+    sess["history"].append({"role": "assistant", "content": customer_reply})
+    session[sess_key] = sess  # Save back
+    session.modified = True
+
+    # Guided step hint
+    turn = sess["turn_count"]
+    guided_step = min(turn, len(LIVECHAT_STEPS) - 1)
+    if turn <= 1:
+        guided_step = 1
+    elif turn == 2:
+        guided_step = 2
+    elif turn == 3:
+        guided_step = 3
+    elif turn <= 5:
+        guided_step = 4
+    elif turn == 6:
+        guided_step = 5
+    elif turn == 7:
+        guided_step = 6
+    elif turn >= 8:
+        guided_step = 7
+
+    return jsonify({
+        "customer_reply": customer_reply,
+        "turn_count": sess["turn_count"],
+        "guided_step": guided_step,
+    })
+
+
+@app.route("/api/session/end", methods=["POST"])
+def api_end_session():
+    """End session and grade the conversation."""
+    data = request.json
+    session_id = data.get("session_id")
+    agent_name = data.get("agent_name", session.get("agent_name", "Anonymous"))
+
+    sess_key = f"sess_{session_id}"
+    sess = session.get(sess_key)
+    if not sess:
+        return jsonify({"error": "Session not found"}), 404
+
+    scenario = sess["scenario"]
+    persona = sess["persona"]
+
+    # Build conversation text
+    conversation_text = ""
+    messages_for_save = []
+    for msg in sess["history"]:
+        role = "Customer" if msg["role"] == "assistant" else "CS Agent"
+        conversation_text += f"{role}: {msg['content']}\n\n"
+        messages_for_save.append({
+            "role": "customer" if msg["role"] == "assistant" else "agent",
+            "content": msg["content"],
+        })
+
+    # Grade
+    livechat_process = load_livechat_process()
+    grading_prompt = build_grading_prompt(livechat_process)
+    grading_text = "Grading unavailable."
+
+    if groq_client:
+        try:
+            response = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": grading_prompt},
+                    {"role": "user", "content": (
+                        f"## Conversation to evaluate:\n\n{conversation_text}\n\n"
+                        f"## Scenario context:\n- Intent: {scenario['intent']}\n"
+                        f"- Tags: {', '.join(scenario.get('tags', []))}\n"
+                        f"- Customer persona: {persona['name']} ({persona['tone']})"
+                    )},
+                ],
+                temperature=0.3,
+                max_tokens=2048,
+            )
+            grading_text = response.choices[0].message.content or grading_text
+        except Exception as e:
+            grading_text = f"Grading error: {e}"
+
+    scores = parse_scores(grading_text)
+    overall = round(sum(scores.values()) / len(scores), 1) if scores else 0
+
+    # Save to Supabase
+    if supabase:
+        try:
+            row = {
+                "agent_name": agent_name,
+                "scenario_id": scenario["id"],
+                "intent": scenario["intent"],
+                "category": scenario.get("category", "Other"),
+                "difficulty": scenario.get("difficulty", "medium"),
+                "persona": persona["name"],
+                "turns": sess["turn_count"],
+                "grader": "groq",
+                "score_greeting": scores.get("greeting"),
+                "score_empathy": scores.get("empathy"),
+                "score_probing": scores.get("probing"),
+                "score_expectation": scores.get("expectation"),
+                "score_troubleshoot": scores.get("troubleshoot"),
+                "score_followup": scores.get("followup"),
+                "score_achieve_more": scores.get("achieve_more"),
+                "score_farewell": scores.get("farewell"),
+                "score_tone": scores.get("tone"),
+                "score_quality": scores.get("quality"),
+                "overall_score": overall,
+                "conversation": messages_for_save,
+                "feedback": grading_text,
+            }
+            supabase.table("training_results").insert(row).execute()
+        except Exception as e:
+            print(f"Supabase save error: {e}")
+
+    # Clean up session
+    session.pop(sess_key, None)
+
+    return jsonify({
+        "grading_text": grading_text,
+        "scores": scores,
+        "overall": overall,
+        "turns": sess["turn_count"],
+        "conversation": messages_for_save,
+    })
+
+
+@app.route("/api/session/hint", methods=["POST"])
+def api_hint():
+    data = request.json
+    session_id = data.get("session_id")
+    sess = session.get(f"sess_{session_id}")
+    if not sess:
+        return jsonify({"hint": "Follow the 8-step livechat process."})
+    intent = sess["scenario"]["intent"]
+    hint = INTENT_HINTS.get(intent, "Follow the 8-step livechat process. Start with greeting and empathy.")
+    return jsonify({"hint": hint, "tags": sess["scenario"].get("tags", [])})
+
+
+@app.route("/api/results")
+def api_results():
+    """Get training results. Leaders see all, agents see own."""
+    if not supabase:
+        return jsonify([])
+
+    agent_name = request.args.get("agent")
+    role = session.get("user_role", "agent")
+
+    try:
+        query = supabase.table("training_results").select("*").order("created_at", desc=True).limit(200)
+        if role != "leader" and agent_name:
+            query = query.eq("agent_name", agent_name)
+        data = query.execute().data or []
+
+        results = []
+        for row in data:
+            scores = {}
+            for key in ["greeting", "empathy", "probing", "expectation", "troubleshoot",
+                         "followup", "achieve_more", "farewell", "tone", "quality"]:
+                val = row.get(f"score_{key}")
+                if val is not None:
+                    scores[key] = val
+            results.append({
+                "timestamp": row.get("created_at", ""),
+                "agent": row.get("agent_name", "Anonymous"),
+                "scenario_id": row.get("scenario_id", ""),
+                "intent": row.get("intent", ""),
+                "category": row.get("category", ""),
+                "difficulty": row.get("difficulty", ""),
+                "persona": row.get("persona", ""),
+                "turns": row.get("turns", 0),
+                "scores": scores,
+                "overall": row.get("overall_score", 0),
+                "conversation": row.get("conversation", []),
+                "feedback": row.get("feedback", ""),
+            })
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/guided-steps")
+def api_guided_steps():
+    return jsonify(LIVECHAT_STEPS)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=os.environ.get("DEBUG", "0") == "1")
