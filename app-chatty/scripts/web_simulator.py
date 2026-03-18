@@ -35,8 +35,15 @@ from groq import Groq
 BASE_DIR = Path(__file__).resolve().parent.parent  # app-chatty/
 SHARED_DIR = BASE_DIR.parent / "shared"
 RESULTS_DIR = BASE_DIR / "scripts" / "results"
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+def _get_secret(key: str) -> str:
+    """Read from Streamlit secrets first, then env var."""
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.environ.get(key, "")
+
+GROQ_API_KEY = _get_secret("GROQ_API_KEY")
+ANTHROPIC_API_KEY = _get_secret("ANTHROPIC_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
