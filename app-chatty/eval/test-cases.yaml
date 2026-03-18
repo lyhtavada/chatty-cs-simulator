@@ -1,0 +1,204 @@
+# Chatty — Eval Test Cases
+# Run these against the bot to measure response quality.
+
+# ─── HOW-TO QUESTIONS ───
+
+- id: chatty-howto-001
+  intent: howto
+  input: "How do I set up the AI assistant for my store?"
+  expected:
+    contains: ["AI Assistant", "data source", "train"]
+    action: answer
+  tags: [ai, setup]
+
+- id: chatty-howto-002
+  intent: howto
+  input: "How do I connect my WhatsApp to Chatty?"
+  expected:
+    contains: ["WhatsApp", "Facebook", "Business"]
+    action: answer
+  tags: [channels, whatsapp, setup]
+
+- id: chatty-howto-003
+  intent: howto
+  input: "How can I add a FAQ page to my store?"
+  expected:
+    contains: ["FAQ", "Build FAQs"]
+    action: answer
+  tags: [faq, setup]
+
+- id: chatty-howto-004
+  intent: howto
+  input: "How do I set up smart product recommendations in AI?"
+  expected:
+    contains: ["Smart Recommendations", "AI Skills", "Pro"]
+    action: answer
+  tags: [ai, skills, setup]
+
+- id: chatty-howto-005
+  intent: howto
+  input: "How do I add team members to Chatty?"
+  expected:
+    contains: ["Team", "invite"]
+    action: answer
+  tags: [team, setup]
+
+# ─── BUG / ISSUE REPORTS ───
+
+- id: chatty-bug-001
+  intent: bug_report
+  input: "The chatbox is not showing on my store"
+  expected:
+    contains: ["chatbox", "turn on", "app embed"]
+    action: answer
+  tags: [chatbox, troubleshoot]
+
+- id: chatty-bug-002
+  intent: bug_report
+  input: "AI is not responding to customer questions"
+  expected:
+    contains: ["AI", "data source", "train"]
+    action: answer
+  tags: [ai, troubleshoot]
+
+- id: chatty-bug-003
+  intent: bug_report
+  input: "I can't connect my email channel, I'm using Outlook"
+  expected:
+    contains: ["Outlook", "email forwarding", "IT admin"]
+    action: answer
+  tags: [email, outlook, troubleshoot]
+
+- id: chatty-bug-004
+  intent: bug_report
+  input: "The translation is not showing on my store"
+  expected:
+    contains: ["Shopify Admin", "Languages", "publish"]
+    action: answer
+  tags: [translation, troubleshoot]
+
+- id: chatty-bug-005
+  intent: bug_report
+  input: "AI keeps recommending wrong products to my customers"
+  expected:
+    contains: ["Smart Recommendations", "collection"]
+    action: answer
+  tags: [ai, recommendations, troubleshoot]
+
+# ─── BILLING ───
+
+- id: chatty-billing-001
+  intent: billing
+  input: "I ran out of AI conversations, what do I do?"
+  expected:
+    contains: ["AI conversation", "upgrade", "$0.40"]
+    action: answer
+  tags: [billing, ai_limit]
+
+- id: chatty-billing-002
+  intent: billing
+  input: "I want a refund, your app doesn't work as advertised"
+  expected:
+    contains: ["refund", "escalat"]
+    action: escalate
+  tags: [billing, refund]
+
+- id: chatty-billing-003
+  intent: billing
+  input: "What's included in the Pro plan?"
+  expected:
+    contains: ["300", "Smart", "CSAT"]
+    action: answer
+  tags: [billing, plans]
+
+# ─── FEATURE REQUESTS ───
+
+- id: chatty-feature-001
+  intent: feature_request
+  input: "Can you add support for Telegram as a channel?"
+  expected:
+    contains: ["feature request", "product team"]
+    not_contains: ["yes we will"]
+    action: answer
+  tags: [feature_request, channels]
+
+# ─── COMPLAINTS ───
+
+- id: chatty-complaint-001
+  intent: complaint
+  input: "Your AI bot keeps giving wrong answers and confusing my customers! I'm losing sales!"
+  expected:
+    contains: ["sorry", "apologize"]
+    not_contains: ["calm down"]
+    action: clarify
+  tags: [complaint, ai, sensitive]
+
+# ─── PRESALES ───
+
+- id: chatty-presales-001
+  intent: presales
+  input: "Does Chatty support multiple languages?"
+  expected:
+    contains: ["translation", "languages"]
+    action: answer
+  tags: [presales, translation]
+
+- id: chatty-presales-002
+  intent: presales
+  input: "Can AI handle customer support 24/7 when my team is offline?"
+  expected:
+    contains: ["AI", "online hours", "availability"]
+    action: answer
+  tags: [presales, ai]
+
+# ─── INTEGRATION ───
+
+- id: chatty-integration-001
+  intent: integration
+  input: "How do I connect Chatty with Klaviyo?"
+  expected:
+    contains: ["Klaviyo", "API key"]
+    action: answer
+  tags: [integration, klaviyo]
+
+# ─── OUT OF SCOPE ───
+
+- id: chatty-oos-001
+  intent: out_of_scope
+  input: "Can you help me set up a loyalty program?"
+  expected:
+    contains: ["Joy"]
+    action: redirect
+  tags: [out_of_scope, joy_redirect]
+
+- id: chatty-oos-002
+  intent: out_of_scope
+  input: "How do I change my Shopify password?"
+  expected:
+    not_contains: ["go to Settings"]
+    action: redirect
+  tags: [out_of_scope]
+
+# ─── EDGE CASES ───
+
+- id: chatty-edge-001
+  intent: ambiguous
+  input: "Chat"
+  expected:
+    action: clarify
+  tags: [ambiguous]
+
+- id: chatty-edge-002
+  intent: bug_report
+  input: "NOTHING IS WORKING I NEED HELP NOW!!!"
+  expected:
+    action: clarify
+  tags: [vague, edge_case, sensitive]
+
+- id: chatty-edge-003
+  intent: multi_intent
+  input: "How do I set up AI and also my chatbox disappeared after updating the theme"
+  expected:
+    contains: ["AI", "chatbox"]
+    action: answer
+  tags: [multi_intent]
