@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 CS Training Simulator — Flask Backend
 Serves the HTML frontend and provides API endpoints for:
@@ -253,11 +255,88 @@ def parse_scores(grading_text: str) -> dict:
 
 # --- Cache scenarios ---
 _scenarios_cache = {}
+_cache_ts = {}
 
 def get_scenarios(app_name: str = "chatty") -> list[dict]:
-    if app_name not in _scenarios_cache:
-        _scenarios_cache[app_name] = load_scenarios(app_name)
+    # Refresh cache every 60s to pick up new custom scenarios
+    now = time.time()
+    if app_name not in _scenarios_cache or now - _cache_ts.get(app_name, 0) > 60:
+        base = load_scenarios(app_name)
+        custom = load_custom_scenarios(app_name)
+        _scenarios_cache[app_name] = base + custom
+        _cache_ts[app_name] = now
     return _scenarios_cache[app_name]
+
+
+def invalidate_cache(app_name: str = "chatty"):
+    _scenarios_cache.pop(app_name, None)
+    _cache_ts.pop(app_name, None)
+
+
+def load_custom_scenarios(app_name: str = "chatty") -> list[dict]:
+    """Load custom scenarios from Supabase."""
+    if not supabase:
+        return []
+    try:
+        data = supabase.table("custom_scenarios") \
+            .select("*") \
+            .eq("app_name", app_name) \
+            .eq("active", True) \
+            .order("created_at", desc=True) \
+            .execute().data or []
+        scenarios = []
+        for row in data:
+            scenarios.append({
+                "id": f"custom_{row['id']}",
+                "intent": row.get("intent", "general"),
+                "opening_message": row.get("opening_message", ""),
+                "tags": row.get("tags", []),
+                "source": "custom",
+                "difficulty": row.get("difficulty", "medium"),
+                "category": row.get("category", "Other"),
+                "reference_answer": row.get("reference_answer", ""),
+            })
+        return scenarios
+    except Exception as e:
+        print(f"Error loading custom scenarios: {e}")
+        return []
+
+
+# --- Scenario Generation Prompt ---
+def build_gen_prompt(topic: str, count: int, app_name: str, difficulty: str | None = None) -> str:
+    diff_guide = ""
+    if difficulty:
+        diff_map = {
+            "easy": "Simple how-to questions, presales inquiries. Customer is friendly and patient.",
+            "medium": "Bug reports, billing questions, setup issues. Customer may be confused or price-sensitive.",
+            "hard": "Angry complaints, edge cases, multi-intent issues. Customer is frustrated or impatient.",
+        }
+        diff_guide = f"\nDifficulty: {difficulty} — {diff_map.get(difficulty, '')}"
+
+    return f"""You are a CS training scenario generator for a Shopify app called {app_name.title()}.
+
+Generate exactly {count} realistic customer support scenarios based on this topic: "{topic}"
+{diff_guide}
+
+For each scenario, output EXACTLY this JSON format (as a JSON array):
+[
+  {{
+    "intent": "howto|bug_report|billing|complaint|presales|feature_request|common_issue",
+    "opening_message": "The customer's first message (realistic, 1-3 sentences)",
+    "difficulty": "easy|medium|hard",
+    "category": "How-to|Bug Report|Billing|Complaint|Pre-sales|Feature Request|Common Issue|Edge Case",
+    "tags": ["tag1", "tag2"],
+    "reference_answer": "Brief guide for CS agent on how to handle this (2-4 sentences)"
+  }}
+]
+
+Rules:
+- Make opening messages realistic — how a real Shopify merchant would type in live chat
+- Vary the tone based on difficulty (easy=friendly, medium=confused, hard=angry)
+- Include specific details (feature names, error messages, plan names) to make scenarios realistic
+- reference_answer should guide the CS agent, not be the exact response
+- Return ONLY valid JSON array, no markdown or extra text
+"""
 
 
 # --- Routes ---
@@ -595,6 +674,162 @@ def api_results():
 @app.route("/api/guided-steps")
 def api_guided_steps():
     return jsonify(LIVECHAT_STEPS)
+
+
+# ------------------------------------------------------------------
+# SCENARIO GENERATOR (Leader only)
+# ------------------------------------------------------------------
+
+@app.route("/api/scenarios/generate", methods=["POST"])
+def api_generate_scenarios():
+    """Generate scenarios using AI. Leader only."""
+    if session.get("user_role") != "leader":
+        return jsonify({"error": "Leader access required"}), 403
+    if not groq_client:
+        return jsonify({"error": "Groq API not configured"}), 500
+
+    data = request.json
+    topic = data.get("topic", "").strip()
+    count = min(int(data.get("count", 5)), 20)  # Max 20 at a time
+    difficulty = data.get("difficulty")  # optional filter
+    app_name = data.get("app", "chatty")
+
+    if not topic:
+        return jsonify({"error": "Topic is required"}), 400
+
+    prompt = build_gen_prompt(topic, count, app_name, difficulty)
+
+    try:
+        response = groq_client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Generate {count} scenarios about: {topic}"},
+            ],
+            temperature=0.8,
+            max_tokens=4096,
+        )
+        raw = response.choices[0].message.content or "[]"
+
+        # Extract JSON from response (handle markdown code blocks)
+        json_match = re.search(r'\[[\s\S]*\]', raw)
+        if json_match:
+            scenarios = json.loads(json_match.group())
+        else:
+            return jsonify({"error": "Failed to parse AI response", "raw": raw}), 500
+
+        # Validate and clean
+        valid = []
+        for s in scenarios:
+            if not s.get("opening_message"):
+                continue
+            valid.append({
+                "intent": s.get("intent", "general"),
+                "opening_message": s["opening_message"],
+                "difficulty": s.get("difficulty", "medium"),
+                "category": s.get("category", "Other"),
+                "tags": s.get("tags", []),
+                "reference_answer": s.get("reference_answer", ""),
+            })
+
+        return jsonify({"scenarios": valid})
+
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI returned invalid JSON", "raw": raw}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/scenarios/save", methods=["POST"])
+def api_save_scenarios():
+    """Save generated scenarios to Supabase. Leader only."""
+    if session.get("user_role") != "leader":
+        return jsonify({"error": "Leader access required"}), 403
+    if not supabase:
+        return jsonify({"error": "Supabase not configured"}), 500
+
+    data = request.json
+    scenarios = data.get("scenarios", [])
+    app_name = data.get("app", "chatty")
+    created_by = session.get("agent_name", "unknown")
+
+    saved = 0
+    for s in scenarios:
+        if not s.get("opening_message"):
+            continue
+        try:
+            row = {
+                "app_name": app_name,
+                "scenario_id": f"gen_{int(time.time())}_{random.randint(100,999)}",
+                "intent": s.get("intent", "general"),
+                "opening_message": s["opening_message"],
+                "difficulty": s.get("difficulty", "medium"),
+                "category": s.get("category", "Other"),
+                "tags": s.get("tags", []),
+                "reference_answer": s.get("reference_answer", ""),
+                "created_by": created_by,
+            }
+            supabase.table("custom_scenarios").insert(row).execute()
+            saved += 1
+        except Exception as e:
+            print(f"Save scenario error: {e}")
+
+    invalidate_cache(app_name)
+    return jsonify({"saved": saved})
+
+
+@app.route("/api/scenarios/custom")
+def api_list_custom():
+    """List custom scenarios. Leader only."""
+    if session.get("user_role") != "leader":
+        return jsonify({"error": "Leader access required"}), 403
+    if not supabase:
+        return jsonify([])
+
+    app_name = request.args.get("app", "chatty")
+    try:
+        data = supabase.table("custom_scenarios") \
+            .select("*") \
+            .eq("app_name", app_name) \
+            .order("created_at", desc=True) \
+            .execute().data or []
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/scenarios/custom/<int:scenario_id>", methods=["DELETE"])
+def api_delete_custom(scenario_id):
+    """Delete a custom scenario. Leader only."""
+    if session.get("user_role") != "leader":
+        return jsonify({"error": "Leader access required"}), 403
+    if not supabase:
+        return jsonify({"error": "Supabase not configured"}), 500
+
+    try:
+        supabase.table("custom_scenarios").delete().eq("id", scenario_id).execute()
+        invalidate_cache()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/scenarios/custom/<int:scenario_id>/toggle", methods=["POST"])
+def api_toggle_custom(scenario_id):
+    """Toggle active/inactive for a custom scenario. Leader only."""
+    if session.get("user_role") != "leader":
+        return jsonify({"error": "Leader access required"}), 403
+    if not supabase:
+        return jsonify({"error": "Supabase not configured"}), 500
+
+    data = request.json
+    active = data.get("active", True)
+    try:
+        supabase.table("custom_scenarios").update({"active": active}).eq("id", scenario_id).execute()
+        invalidate_cache()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

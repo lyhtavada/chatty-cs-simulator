@@ -219,6 +219,40 @@
   .history-score.s-high{color:var(--green-text)}.history-score.s-mid{color:#D97706}.history-score.s-low{color:var(--red-text)}
   .history-time{font-size:11px;color:var(--gray-400);min-width:60px;text-align:right}
 
+  /* Generator */
+  .gen-form{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+  .gen-row{display:flex;gap:12px;margin-bottom:16px;align-items:flex-end}
+  .gen-row .field-group{flex:1;margin-bottom:0}
+  .gen-btn{padding:10px 20px;border-radius:var(--radius-sm);border:none;background:var(--blue-600);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;white-space:nowrap;height:38px;display:flex;align-items:center;gap:6px}
+  .gen-btn:hover{background:var(--blue-800)}
+  .gen-btn:disabled{background:var(--gray-200);cursor:not-allowed}
+  .gen-preview{margin-top:16px}
+  .gen-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:16px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;transition:border-color .15s}
+  .gen-card:hover{border-color:var(--blue-200)}
+  .gen-card-check{margin-top:2px;flex-shrink:0;width:18px;height:18px;border-radius:4px;border:1.5px solid var(--gray-200);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-size:11px;color:#fff}
+  .gen-card-check.checked{background:var(--blue-600);border-color:var(--blue-600)}
+  .gen-card-body{flex:1;min-width:0}
+  .gen-card-msg{font-size:13.5px;color:var(--gray-900);line-height:1.5;margin-bottom:6px}
+  .gen-card-meta{display:flex;gap:6px;flex-wrap:wrap}
+  .gen-card-ref{font-size:12px;color:var(--gray-400);margin-top:6px;line-height:1.45}
+  .gen-card-actions{display:flex;gap:6px;flex-shrink:0}
+  .gen-card-del{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--gray-400);transition:all .15s}
+  .gen-card-del:hover{border-color:var(--red-text);color:var(--red-text);background:var(--red-bg)}
+  .gen-save-bar{display:flex;gap:10px;align-items:center;margin-top:16px;padding:16px;background:var(--blue-50);border-radius:var(--radius)}
+  .gen-save-bar .count{font-size:13px;color:var(--blue-800);flex:1}
+  .gen-save-btn{padding:9px 20px;border-radius:var(--radius-sm);border:none;background:var(--blue-600);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
+  .gen-save-btn:hover{background:var(--blue-800)}
+  .custom-list{margin-top:24px}
+  .custom-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
+  .custom-item:last-child{border-bottom:none}
+  .custom-msg{flex:1;color:var(--gray-600);line-height:1.4}
+  .custom-toggle{width:36px;height:20px;border-radius:10px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+  .custom-toggle.on{background:var(--green-text)}
+  .custom-toggle.off{background:var(--gray-200)}
+  .custom-toggle::after{content:'';position:absolute;top:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:left .2s,right .2s}
+  .custom-toggle.on::after{right:3px;left:auto}
+  .custom-toggle.off::after{left:3px;right:auto}
+
   /* Scrollbar */
   ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--gray-200);border-radius:10px}
 
@@ -302,6 +336,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         Dashboard
       </div>
+      <div class="nav-item" id="nav-generator" onclick="showPage('generator')" style="display:none">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Scenarios
+      </div>
     </nav>
 
     <div class="agent-info">
@@ -346,6 +384,51 @@
           <div class="dash-card-title">Recent sessions</div>
           <div class="history-list" id="dash-history"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Generator page (Leader only) -->
+    <div class="page hidden" id="page-generator">
+      <div class="page-header">
+        <div class="page-title">✨ Scenario Generator</div>
+        <p class="page-desc">Generate new training scenarios with AI — review and save the ones you like</p>
+      </div>
+
+      <div class="gen-form">
+        <div class="gen-row">
+          <div class="field-group">
+            <label class="field-label">Topic / Description</label>
+            <input class="field-input" id="gen-topic" type="text" placeholder="e.g. AI chatbot not responding, billing refund request, WhatsApp integration setup..." />
+          </div>
+          <div class="field-group" style="max-width:100px">
+            <label class="field-label">Count</label>
+            <select class="field-select" id="gen-count">
+              <option value="3">3</option>
+              <option value="5" selected>5</option>
+              <option value="10">10</option>
+            </select>
+          </div>
+          <div class="field-group" style="max-width:120px">
+            <label class="field-label">Difficulty</label>
+            <select class="field-select" id="gen-difficulty">
+              <option value="">Any</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+          <button class="gen-btn" id="gen-btn" onclick="generateScenarios()">✨ Generate</button>
+        </div>
+      </div>
+
+      <div id="gen-results"></div>
+
+      <div class="custom-list" id="custom-list-section" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div class="section-heading" style="margin-bottom:0">Saved custom scenarios</div>
+          <div class="scenarios-count" id="custom-count"></div>
+        </div>
+        <div id="custom-list"></div>
       </div>
     </div>
 
@@ -462,7 +545,10 @@ async function doLogin() {
     document.getElementById('agent-display-name').textContent = data.name;
     document.getElementById('agent-display-role').textContent = data.role === 'leader' ? 'Leader' : 'CS Agent';
     document.getElementById('agent-avatar').textContent = data.name[0].toUpperCase();
-    if (data.role === 'leader') document.getElementById('dash-desc').textContent = 'All agents\' results';
+    if (data.role === 'leader') {
+      document.getElementById('dash-desc').textContent = 'All agents\' results';
+      document.getElementById('nav-generator').style.display = '';
+    }
 
     loadScenarios();
   } catch(e) { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
@@ -824,15 +910,16 @@ function showPage(page) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`nav-${page}`).classList.add('active');
 
-  document.getElementById('page-practice').classList.toggle('hidden', page !== 'practice');
-  document.getElementById('page-practice').style.display = page === 'practice' ? '' : 'none';
-  document.getElementById('page-dashboard').classList.toggle('hidden', page !== 'dashboard');
-  document.getElementById('page-dashboard').style.display = page === 'dashboard' ? '' : 'none';
+  ['practice', 'dashboard', 'generator'].forEach(p => {
+    const el = document.getElementById(`page-${p}`);
+    if (el) { el.classList.toggle('hidden', page !== p); el.style.display = page === p ? '' : 'none'; }
+  });
   document.getElementById('page-chat').style.display = 'none';
   document.getElementById('main-content').style.padding = '36px 40px';
   document.getElementById('main-content').style.overflow = 'auto';
 
   if (page === 'dashboard') loadDashboard();
+  if (page === 'generator') loadCustomScenarios();
 }
 
 // ══════════════════════════════════════════════
@@ -897,6 +984,188 @@ function renderDashboard(results) {
       </div>`;
     }).join('');
   }
+}
+
+// ══════════════════════════════════════════════
+//  SCENARIO GENERATOR (Leader only)
+// ══════════════════════════════════════════════
+let generatedScenarios = [];
+let selectedGenIds = new Set();
+
+async function generateScenarios() {
+  const topic = document.getElementById('gen-topic').value.trim();
+  if (!topic) { alert('Enter a topic first'); return; }
+
+  const count = document.getElementById('gen-count').value;
+  const difficulty = document.getElementById('gen-difficulty').value;
+  const btn = document.getElementById('gen-btn');
+  const resultsEl = document.getElementById('gen-results');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div> Generating...';
+  resultsEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)"><div class="loading-dots"><span></span><span></span><span></span></div><br>Generating scenarios with AI...</div>';
+
+  try {
+    const res = await fetch('/api/scenarios/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({topic, count: parseInt(count), difficulty: difficulty || undefined, app: 'chatty'}),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      resultsEl.innerHTML = `<div style="color:var(--red-text);padding:20px">Error: ${data.error}</div>`;
+      return;
+    }
+
+    generatedScenarios = data.scenarios || [];
+    selectedGenIds = new Set(generatedScenarios.map((_, i) => i)); // Select all by default
+    renderGeneratedScenarios();
+
+  } catch(e) {
+    resultsEl.innerHTML = `<div style="color:var(--red-text);padding:20px">Connection error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ Generate';
+  }
+}
+
+function renderGeneratedScenarios() {
+  const el = document.getElementById('gen-results');
+  if (!generatedScenarios.length) {
+    el.innerHTML = '';
+    return;
+  }
+
+  let html = `<div style="font-size:13px;font-weight:600;color:var(--gray-900);margin-bottom:12px">${generatedScenarios.length} scenarios generated</div>`;
+
+  html += generatedScenarios.map((s, i) => {
+    const checked = selectedGenIds.has(i);
+    return `<div class="gen-card">
+      <div class="gen-card-check ${checked ? 'checked' : ''}" onclick="toggleGenSelect(${i})">
+        ${checked ? '✓' : ''}
+      </div>
+      <div class="gen-card-body">
+        <div class="gen-card-msg">${escHtml(s.opening_message)}</div>
+        <div class="gen-card-meta">
+          <span class="pc-diff-badge ${s.difficulty}">${capitalize(s.difficulty)}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--gray-100);color:var(--gray-600)">${s.category}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--gray-100);color:var(--gray-600)">${s.intent}</span>
+        </div>
+        ${s.reference_answer ? `<div class="gen-card-ref">💡 ${escHtml(s.reference_answer)}</div>` : ''}
+      </div>
+      <div class="gen-card-actions">
+        <div class="gen-card-del" onclick="removeGenScenario(${i})" title="Remove">×</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const selectedCount = selectedGenIds.size;
+  html += `<div class="gen-save-bar">
+    <div class="count">${selectedCount} of ${generatedScenarios.length} selected</div>
+    <button class="score-btn-retry" onclick="selectAllGen()" style="padding:7px 14px;font-size:12px">Select All</button>
+    <button class="gen-save-btn" onclick="saveGeneratedScenarios()" ${selectedCount === 0 ? 'disabled' : ''}>💾 Save ${selectedCount} Scenarios</button>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function toggleGenSelect(idx) {
+  if (selectedGenIds.has(idx)) selectedGenIds.delete(idx);
+  else selectedGenIds.add(idx);
+  renderGeneratedScenarios();
+}
+
+function selectAllGen() {
+  if (selectedGenIds.size === generatedScenarios.length) {
+    selectedGenIds.clear();
+  } else {
+    selectedGenIds = new Set(generatedScenarios.map((_, i) => i));
+  }
+  renderGeneratedScenarios();
+}
+
+function removeGenScenario(idx) {
+  generatedScenarios.splice(idx, 1);
+  selectedGenIds.clear();
+  generatedScenarios.forEach((_, i) => selectedGenIds.add(i));
+  renderGeneratedScenarios();
+}
+
+async function saveGeneratedScenarios() {
+  const toSave = generatedScenarios.filter((_, i) => selectedGenIds.has(i));
+  if (!toSave.length) return;
+
+  try {
+    const res = await fetch('/api/scenarios/save', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({scenarios: toSave, app: 'chatty'}),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      document.getElementById('gen-results').innerHTML =
+        `<div style="text-align:center;padding:30px;color:var(--green-text)">✅ ${data.saved} scenarios saved! They'll appear in Practice immediately.</div>`;
+      generatedScenarios = [];
+      selectedGenIds.clear();
+      loadScenarios(); // Refresh scenario list
+      loadCustomScenarios();
+    } else {
+      alert('Save error: ' + (data.error || 'Unknown'));
+    }
+  } catch(e) { alert('Connection error: ' + e.message); }
+}
+
+async function loadCustomScenarios() {
+  const section = document.getElementById('custom-list-section');
+  const listEl = document.getElementById('custom-list');
+
+  try {
+    const res = await fetch('/api/scenarios/custom?app=chatty');
+    const data = await res.json();
+
+    if (!Array.isArray(data) || !data.length) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+    document.getElementById('custom-count').textContent = `${data.length} custom scenarios`;
+
+    listEl.innerHTML = data.map(s => `
+      <div class="custom-item">
+        <div class="pc-diff-dot ${s.difficulty}" style="flex-shrink:0"></div>
+        <div class="custom-msg">
+          <div style="font-weight:500;color:var(--gray-900);margin-bottom:2px">${escHtml(s.opening_message.substring(0, 80))}${s.opening_message.length > 80 ? '...' : ''}</div>
+          <div style="font-size:11px;color:var(--gray-400)">${s.category} · ${s.intent} · by ${s.created_by || '?'}</div>
+        </div>
+        <div class="custom-toggle ${s.active ? 'on' : 'off'}" onclick="toggleCustom(${s.id}, ${!s.active})" title="${s.active ? 'Active' : 'Inactive'}"></div>
+        <div class="gen-card-del" onclick="deleteCustom(${s.id})" title="Delete">×</div>
+      </div>
+    `).join('');
+  } catch(e) { console.error('Load custom error', e); }
+}
+
+async function toggleCustom(id, active) {
+  try {
+    await fetch(`/api/scenarios/custom/${id}/toggle`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({active}),
+    });
+    loadCustomScenarios();
+    loadScenarios();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function deleteCustom(id) {
+  if (!confirm('Delete this scenario?')) return;
+  try {
+    await fetch(`/api/scenarios/custom/${id}`, {method: 'DELETE'});
+    loadCustomScenarios();
+    loadScenarios();
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 // ══════════════════════════════════════════════
