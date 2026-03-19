@@ -239,16 +239,32 @@ Evaluate the CS agent's performance in this practice live chat session.
 At the END of your evaluation, add this exact line:
 SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, language=X, product_knowledge=X, quality=X
 
-Also provide 3 specific, actionable tips for improvement.
+## IMPORTANT: Context-aware scoring
+Not every conversation requires all 8 steps to be perfect. Score based on what's appropriate for the specific scenario:
+- A simple how-to question may not need deep empathy — don't penalize for that
+- If the issue is resolved in 3 turns, skipping "Achieve More" is acceptable
+- Focus on whether the agent resolved the customer's issue effectively
+- Only penalize for steps that were clearly needed but missing
+
 Overall: 9-10 Excellent, 7-8 Good, 5-6 Needs Work, <5 Re-train.
 
-## Suggested Responses
-After the SCORES line, for EACH CS agent message in the conversation, provide a suggested better response.
-Use this exact format (one block per CS agent message, numbered starting from 1):
-SUGGESTED_1: <A better version of the agent's 1st message>
-SUGGESTED_2: <A better version of the agent's 2nd message>
-... and so on for each agent message.
-Keep suggestions concise and professional. If the agent's message was already good, still provide a slightly improved version.
+## Output Structure
+After your evaluation, output in this EXACT order:
+
+### 1. Tips for improvement (3 specific, actionable tips)
+TIPS:
+TIP_1: <first tip>
+TIP_2: <second tip>
+TIP_3: <third tip>
+
+### 2. Scores
+SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, language=X, product_knowledge=X, quality=X
+
+### 3. Suggested better responses
+For EACH CS agent message, provide a better version:
+SUGGESTED_1: <improved version of agent's 1st message>
+SUGGESTED_2: <improved version of agent's 2nd message>
+... and so on. Keep suggestions concise. If already good, still provide a slightly improved version.
 """
 
 
@@ -271,6 +287,14 @@ def parse_suggestions(grading_text: str) -> list[str]:
     for m in re.finditer(r"SUGGESTED_\d+:\s*(.+)", grading_text):
         suggestions.append(m.group(1).strip())
     return suggestions
+
+
+def parse_tips(grading_text: str) -> list[str]:
+    """Parse TIP_N: lines from grading output."""
+    tips = []
+    for m in re.finditer(r"TIP_\d+:\s*(.+)", grading_text):
+        tips.append(m.group(1).strip())
+    return tips
 
 
 # --- Cache scenarios ---
@@ -606,6 +630,7 @@ def api_end_session():
 
     scores = parse_scores(grading_text)
     suggestions = parse_suggestions(grading_text)
+    tips = parse_tips(grading_text)
     overall = round(sum(scores.values()) / len(scores), 1) if scores else 0
 
     # Save to Supabase
@@ -648,6 +673,7 @@ def api_end_session():
         "turns": sess["turn_count"],
         "conversation": messages_for_save,
         "suggestions": suggestions,
+        "tips": tips,
     })
 
 

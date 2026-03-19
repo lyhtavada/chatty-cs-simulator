@@ -101,23 +101,34 @@
   /* Conversation review overlay */
   .review-overlay{position:fixed;inset:0;z-index:210;background:rgba(4,44,83,.45);display:flex;align-items:center;justify-content:center;animation:overlayIn .2s ease}
   .review-overlay.hidden{display:none}
-  .review-modal{background:#fff;border-radius:16px;border:1px solid var(--gray-200);width:580px;max-width:94vw;max-height:88vh;display:flex;flex-direction:column;animation:modalIn .22s ease}
-  .review-header{padding:24px 28px 16px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+  .review-modal{background:#fff;border-radius:16px;border:1px solid var(--gray-200);width:960px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;animation:modalIn .22s ease}
+  .review-header{padding:20px 24px 14px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
   .review-title{font-size:16px;font-weight:600;color:var(--blue-900)}
   .review-meta{font-size:12px;color:var(--gray-400);margin-top:2px}
   .review-close{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--gray-400);font-size:16px;transition:all .15s}
   .review-close:hover{border-color:var(--blue-200);color:var(--gray-900)}
-  .review-body{flex:1;overflow-y:auto;padding:20px 28px;display:flex;flex-direction:column;gap:4px;background:var(--gray-50)}
-  .review-msg{display:flex;gap:10px;max-width:80%;margin-bottom:8px}
+  .review-columns{flex:1;display:flex;overflow:hidden;min-height:0}
+  .review-col-chat{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:4px;background:var(--gray-50);border-right:1px solid var(--gray-200)}
+  .review-col-feedback{flex:1;overflow-y:auto;padding:20px 24px;background:#fff;display:flex;flex-direction:column;gap:16px}
+  .review-msg{display:flex;gap:10px;max-width:88%;margin-bottom:8px}
   .review-msg.bot{align-self:flex-start}.review-msg.cs{align-self:flex-end;flex-direction:row-reverse}
   .review-msg .msg-bubble{padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.55;color:var(--gray-900)}
   .review-msg.bot .msg-bubble{background:#fff;border:1px solid var(--gray-200);border-top-left-radius:4px}
   .review-msg.cs .msg-bubble{background:var(--blue-600);color:#fff;border-top-right-radius:4px}
   .review-msg .msg-name{font-size:11px;color:var(--gray-400);font-weight:500}
   .review-msg.cs .msg-name{text-align:right}
-  .review-feedback{flex-shrink:0;padding:16px 28px;border-top:1px solid var(--gray-100);background:#fff}
-  .review-feedback-title{font-size:11px;font-weight:600;color:var(--gray-400);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
-  .review-feedback-text{font-size:13px;color:var(--gray-900);line-height:1.6;max-height:150px;overflow-y:auto;white-space:pre-wrap}
+  .review-section-title{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+  .review-scores-table{width:100%;border-collapse:collapse}
+  .review-scores-table td{padding:6px 0;font-size:12px;border-bottom:1px solid var(--gray-100)}
+  .review-scores-table td:first-child{color:var(--gray-600)}
+  .review-scores-table td:last-child{text-align:right;font-weight:600;font-family:var(--font-mono);font-size:12px}
+  .review-scores-table td.s-good{color:var(--green-text)}.review-scores-table td.s-warn{color:var(--amber-text)}.review-scores-table td.s-bad{color:var(--red-text)}
+  .review-tip{display:flex;gap:8px;font-size:12px;line-height:1.5;color:var(--gray-600)}
+  .review-tip-icon{flex-shrink:0;margin-top:1px}
+  .review-sug-item{padding:10px 12px;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-size:12px;line-height:1.5}
+  .review-sug-label{font-size:10px;font-weight:600;color:var(--gray-400);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+  .review-sug-original{color:var(--gray-400);margin-bottom:6px;font-style:italic}
+  .review-sug-better{color:var(--green-text)}
 
   /* How it works modal */
   .hiw-trigger{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--blue-400);cursor:pointer;font-weight:500;margin-left:8px;padding:3px 8px;border-radius:var(--radius-sm);transition:all .15s}
@@ -628,10 +639,9 @@
         <div class="review-close" onclick="document.getElementById('review-overlay').classList.add('hidden')">&times;</div>
       </div>
     </div>
-    <div class="review-body" id="review-body"></div>
-    <div class="review-feedback" id="review-feedback-section">
-      <div class="review-feedback-title">AI Feedback</div>
-      <div class="review-feedback-text" id="review-feedback-text"></div>
+    <div class="review-columns">
+      <div class="review-col-chat" id="review-body"></div>
+      <div class="review-col-feedback" id="review-feedback-col"></div>
     </div>
   </div>
 </div>
@@ -1063,59 +1073,85 @@ function closeScore() {
 }
 
 function showConversationReview(data) {
-  // data can be passed from dashboard, or use current session state
   const conversation = data?.conversation || STATE.chatHistory;
   const feedback = data?.feedback || STATE.lastScoreData?.grading_text || '';
   const suggestions = data?.suggestions || STATE.lastScoreData?.suggestions || [];
+  const tips = data?.tips || STATE.lastScoreData?.tips || [];
   const scenario = data?.scenario || STATE.sessionScenario || {};
   const persona = data?.persona || STATE.sessionPersona?.name || 'Customer';
   const scores = data?.scores || STATE.lastScoreData?.scores || {};
   const overall = data?.overall || STATE.lastScoreData?.overall || 0;
   const agent = data?.agent || STATE.user?.name || 'You';
 
-  // Store for download
-  STATE.reviewData = {conversation, feedback, suggestions, scenario, persona, scores, overall, agent};
+  STATE.reviewData = {conversation, feedback, suggestions, tips, scenario, persona, scores, overall, agent};
 
   document.getElementById('review-title').textContent = scenario?.category || scenario?.intent || 'Conversation Review';
   document.getElementById('review-meta').textContent =
     `${capitalize(scenario?.difficulty || '')} · ${scenario?.category || ''} · ${conversation.length} messages · Score: ${overall}`;
 
+  // Left column: chat log
   const body = document.getElementById('review-body');
-  let agentIdx = 0;
   body.innerHTML = conversation.map(m => {
     const isCustomer = m.role === 'customer';
     const msgText = m.text || m.content || '';
-    let sugHtml = '';
-    if (!isCustomer && suggestions.length > agentIdx) {
-      const sug = suggestions[agentIdx];
-      agentIdx++;
-      sugHtml = `<div class="review-suggestion" onclick="this.classList.toggle('open')">
-        <div class="sug-label">💡 Suggested response <span style="font-weight:400;font-size:10px;color:var(--gray-400)">(click to expand)</span></div>
-        <div class="sug-text">${escHtml(sug)}</div>
-      </div>`;
-    } else if (!isCustomer) {
-      agentIdx++;
-    }
     return `<div class="review-msg ${isCustomer ? 'bot' : 'cs'}">
       <div class="msg-avatar ${isCustomer ? 'bot-av' : 'cs-av'}">${isCustomer ? '👤' : (agent?.[0]?.toUpperCase() || 'A')}</div>
       <div class="msg-body">
         <div class="msg-name">${isCustomer ? persona : agent}</div>
         <div class="msg-bubble">${escHtml(msgText)}</div>
-        ${sugHtml}
       </div>
     </div>`;
   }).join('');
 
-  const feedbackSection = document.getElementById('review-feedback-section');
-  const feedbackText = document.getElementById('review-feedback-text');
-  if (feedback) {
-    feedbackSection.style.display = '';
-    // Clean up SUGGESTED_ lines from display
-    const cleanFeedback = feedback.replace(/SUGGESTED_\d+:.*$/gm, '').trim();
-    feedbackText.textContent = cleanFeedback;
-  } else {
-    feedbackSection.style.display = 'none';
+  // Right column: feedback
+  const fbCol = document.getElementById('review-feedback-col');
+  const scoreLabels = {
+    greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',
+    troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',
+    farewell:'Farewell',language:'Language',product_knowledge:'Product Knowledge',quality:'Quality'
+  };
+
+  let fbHtml = '';
+
+  // 1. Scores table
+  if (scores && Object.keys(scores).length) {
+    fbHtml += `<div>
+      <div class="review-section-title">Evaluation · Overall ${overall}/10</div>
+      <table class="review-scores-table">`;
+    for (const [k, v] of Object.entries(scores)) {
+      let cls = 's-good'; if(v < 5) cls = 's-bad'; else if(v < 7) cls = 's-warn';
+      fbHtml += `<tr><td>${scoreLabels[k] || k}</td><td class="${cls}">${v}/10</td></tr>`;
+    }
+    fbHtml += `</table></div>`;
   }
+
+  // 2. Tips for improvement
+  if (tips.length) {
+    fbHtml += `<div><div class="review-section-title">Tips for Improvement</div>`;
+    fbHtml += tips.map(t => `<div class="review-tip"><div class="review-tip-icon">💡</div><div>${escHtml(t)}</div></div>`).join('');
+    fbHtml += `</div>`;
+  }
+
+  // 3. Suggested better responses
+  const agentMsgs = conversation.filter(m => m.role !== 'customer');
+  if (suggestions.length) {
+    fbHtml += `<div><div class="review-section-title">Suggested Better Responses</div>`;
+    fbHtml += suggestions.map((sug, i) => {
+      const original = agentMsgs[i] ? (agentMsgs[i].text || agentMsgs[i].content || '') : '';
+      return `<div class="review-sug-item">
+        <div class="review-sug-label">Message ${i + 1}</div>
+        ${original ? `<div class="review-sug-original">"${escHtml(original.substring(0, 80))}${original.length > 80 ? '...' : ''}"</div>` : ''}
+        <div class="review-sug-better">→ ${escHtml(sug)}</div>
+      </div>`;
+    }).join('');
+    fbHtml += `</div>`;
+  }
+
+  if (!fbHtml) {
+    fbHtml = '<div style="color:var(--gray-400);font-size:13px;padding:20px">No feedback available</div>';
+  }
+
+  fbCol.innerHTML = fbHtml;
 
   document.getElementById('review-overlay').classList.remove('hidden');
 }
