@@ -32,9 +32,22 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 LEADER_PASSWORD = os.environ.get("LEADER_PASSWORD", "avada2024")
 GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant"
 
 # --- Clients ---
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+
+
+def groq_create(**kwargs):
+    """Call Groq API with automatic fallback to a secondary model on rate limit."""
+    try:
+        return groq_client.chat.completions.create(model=GROQ_MODEL, **kwargs)
+    except Exception as e:
+        err_str = str(e)
+        if "429" in err_str or "rate_limit_exceeded" in err_str:
+            # Fallback to lighter model
+            return groq_client.chat.completions.create(model=GROQ_FALLBACK_MODEL, **kwargs)
+        raise
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 # --- In-memory chat session store (avoids cookie size limit) ---
@@ -348,6 +361,19 @@ def load_custom_scenarios(app_name: str = "chatty") -> list[dict]:
         return []
 
 
+# --- Product Knowledge for Generator ---
+_product_knowledge_cache: str = ""
+
+def load_product_knowledge(app_name: str = "chatty") -> str:
+    global _product_knowledge_cache
+    if _product_knowledge_cache:
+        return _product_knowledge_cache
+    pk_file = DATA_DIR / app_name / "product-knowledge.md"
+    if pk_file.exists():
+        _product_knowledge_cache = pk_file.read_text(encoding="utf-8")
+    return _product_knowledge_cache
+
+
 # --- Scenario Generation Prompt ---
 def build_gen_prompt(topic: str, count: int, app_name: str, difficulty: str | None = None) -> str:
     diff_guide = ""
@@ -359,28 +385,76 @@ def build_gen_prompt(topic: str, count: int, app_name: str, difficulty: str | No
         }
         diff_guide = f"\nDifficulty: {difficulty} — {diff_map.get(difficulty, '')}"
 
+    product_knowledge = load_product_knowledge(app_name)
+    pk_section = ""
+    if product_knowledge:
+        pk_section = f"""
+## Product Knowledge (use this to create accurate scenarios)
+{product_knowledge}
+"""
+
     return f"""You are a CS training scenario generator for a Shopify app called {app_name.title()}.
 
 Generate exactly {count} realistic customer support scenarios based on this topic: "{topic}"
 {diff_guide}
+{pk_section}
+
+## Examples of good scenarios
+
+Example 1 (easy — howto):
+{{
+  "intent": "howto",
+  "opening_message": "Hi, I just installed Chatty and I'm trying to set up the AI assistant. Where do I start?",
+  "difficulty": "easy",
+  "category": "How-to",
+  "tags": ["ai", "setup", "new_user"],
+  "reference_answer": "Guide the merchant to AI Assistant section, help them add data sources (products auto-sync, add custom Q&As), configure AI instructions, and test using the built-in Test feature."
+}}
+
+Example 2 (medium — bug_report):
+{{
+  "intent": "bug_report",
+  "opening_message": "The AI is showing $29.99 for a product that costs $39.99 on my French market domain. Customers are complaining about the wrong price.",
+  "difficulty": "medium",
+  "category": "Bug Report",
+  "tags": ["ai", "pricing", "markets"],
+  "reference_answer": "Check if Shopify Markets is set up and 'Sync Markets' is enabled in AI settings. Reproduce by visiting the market domain. If Markets configured correctly but issue persists, request staff access and escalate to dev team."
+}}
+
+Example 3 (hard — complaint):
+{{
+  "intent": "complaint",
+  "opening_message": "I've been paying $68.99/month for Pro and the AI STILL gives wrong answers after 3 months. I've contacted support 4 times and nobody fixed it. I want a full refund NOW or I'm leaving a 1-star review.",
+  "difficulty": "hard",
+  "category": "Complaint",
+  "tags": ["complaint", "refund", "ai", "sensitive"],
+  "reference_answer": "Apologize sincerely, acknowledge the repeated frustration. Ask for specific chat IDs where AI was wrong. Review AI data sources and instructions. NEVER approve refund without CSL approval. Escalate to CS Leader with full context. Offer to personally follow up until resolved."
+}}
+
+## Output format
 
 For each scenario, output EXACTLY this JSON format (as a JSON array):
 [
   {{
-    "intent": "howto|bug_report|billing|complaint|presales|feature_request|common_issue",
+    "intent": "howto|bug_report|billing|complaint|presales|feature_request|common_issue|out_of_scope|ambiguous|multi_intent",
     "opening_message": "The customer's first message (realistic, 1-3 sentences)",
     "difficulty": "easy|medium|hard",
-    "category": "How-to|Bug Report|Billing|Complaint|Pre-sales|Feature Request|Common Issue|Edge Case",
+    "category": "How-to|Bug Report|Billing|Complaint|Pre-sales|Feature Request|Common Issue|Edge Case|Integration",
     "tags": ["tag1", "tag2"],
-    "reference_answer": "Brief guide for CS agent on how to handle this (2-4 sentences)"
+    "reference_answer": "Brief guide for CS agent on how to handle this (2-4 sentences). Include specific steps, feature names, and when to escalate."
   }}
 ]
 
-Rules:
-- Make opening messages realistic — how a real Shopify merchant would type in live chat
-- Vary the tone based on difficulty (easy=friendly, medium=confused, hard=angry)
-- Include specific details (feature names, error messages, plan names) to make scenarios realistic
-- reference_answer should guide the CS agent, not be the exact response
+## Rules
+- Make opening messages realistic — how a real Shopify merchant would type in live chat (casual, sometimes with typos or urgency)
+- Vary the tone based on difficulty (easy=friendly/curious, medium=confused/concerned, hard=angry/frustrated/threatening)
+- Use REAL feature names, plan names, and pricing from the product knowledge above
+- Include specific details: error messages, feature paths (e.g., "AI Assistant > Data Source"), plan names (Free/Basic/Pro/Plus), pricing ($19.99/$68.99/$199.99)
+- reference_answer must include actionable steps for CS agents, mention specific tools (DevZone, shortcuts), and note when to escalate
+- Do NOT create generic scenarios — each must reference a specific Chatty feature or workflow
+- For billing scenarios: mention real plan prices and limits
+- For bug reports: include realistic symptoms the merchant would describe
+- For complaints: include emotional language and specific grievances
 - Return ONLY valid JSON array, no markdown or extra text
 """
 
@@ -462,8 +536,7 @@ def api_start_session():
     opening = scenario["opening_message"]
     if groq_client:
         try:
-            response = groq_client.chat.completions.create(
-                model=GROQ_MODEL,
+            response = groq_create(
                 messages=[
                     {"role": "system", "content": customer_prompt},
                     {"role": "user", "content": "Start the conversation. Send your opening message as the customer. Keep it short (1-2 sentences)."},
@@ -529,15 +602,18 @@ def api_send_message():
             messages = [{"role": "system", "content": sess["customer_prompt"] + turn_hint}]
             messages.extend(sess["history"])
 
-            response = groq_client.chat.completions.create(
-                model=GROQ_MODEL,
+            response = groq_create(
                 messages=messages,
                 temperature=0.7,
                 max_tokens=256,
             )
             customer_reply = response.choices[0].message.content or customer_reply
         except Exception as e:
-            customer_reply = f"(Error: {e})"
+            err_str = str(e)
+            if "429" in err_str or "rate_limit_exceeded" in err_str:
+                customer_reply = "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau ít phút nhé!"
+            else:
+                customer_reply = "Xin lỗi, có lỗi kết nối. Vui lòng thử lại!"
 
     sess["history"].append({"role": "assistant", "content": customer_reply})
 
@@ -614,8 +690,7 @@ def api_end_session():
 
     if groq_client:
         try:
-            response = groq_client.chat.completions.create(
-                model=GROQ_MODEL,
+            response = groq_create(
                 messages=[
                     {"role": "system", "content": grading_prompt},
                     {"role": "user", "content": (
@@ -630,7 +705,11 @@ def api_end_session():
             )
             grading_text = response.choices[0].message.content or grading_text
         except Exception as e:
-            grading_text = f"Grading error: {e}"
+            err_str = str(e)
+            if "429" in err_str or "rate_limit_exceeded" in err_str:
+                grading_text = "Chấm điểm tạm thời không khả dụng do giới hạn API. Vui lòng thử lại sau ít phút!"
+            else:
+                grading_text = f"Grading error: {e}"
 
     scores = parse_scores(grading_text)
     suggestions = parse_suggestions(grading_text)
@@ -774,8 +853,7 @@ def api_generate_scenarios():
     prompt = build_gen_prompt(topic, count, app_name, difficulty)
 
     try:
-        response = groq_client.chat.completions.create(
-            model=GROQ_MODEL,
+        response = groq_create(
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": f"Generate {count} scenarios about: {topic}"},
