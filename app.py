@@ -223,21 +223,18 @@ Evaluate the CS agent's performance in this practice live chat session.
 
 ## Scoring (0-10 for each):
 
-1. **Greeting** (0-10): Did they greet properly and introduce themselves?
-2. **Empathy** (0-10): Did they acknowledge the customer's situation?
-3. **Probing** (0-10): Did they ask good questions to understand the root issue?
-4. **Set Expectation** (0-10): Did they inform about next steps / handling time?
-5. **Troubleshoot** (0-10): Was the solution correct, clear, and actionable?
-6. **Follow-up** (0-10): Did they confirm resolution?
-7. **Achieve More** (0-10): Did they offer additional help?
-8. **Farewell & Review** (0-10): Did they thank and ask for review?
-9. **Language** (0-10): Grammar, spelling, punctuation, tone, writing style — natural and professional, not robotic?
-10. **Product Knowledge** (0-10): Was the information about the app/features accurate and specific?
-11. **Response Quality** (0-10): Clear, concise, well-structured responses?
+1. **Communication** (0-10): Greeting, empathy, farewell — was the agent polite, warm, and professional in opening and closing the conversation? Did they acknowledge the customer's situation?
+2. **Problem Understanding** (0-10): Did the agent ask the right questions to understand the root issue? Did they set clear expectations about next steps and handling time?
+3. **Troubleshooting** (0-10): Was the solution correct, clear, step-by-step, and actionable? Did they guide the customer effectively?
+4. **Product Knowledge** (0-10): SCORE THIS STRICTLY. Was the information about the app, features, settings, and plans accurate and specific? Did they reference correct feature names, navigation paths, and limitations? Deduct points for vague or generic answers.
+5. **Language & Tone** (0-10): SCORE THIS STRICTLY. Grammar, spelling, punctuation correctness. Natural and professional writing style — not robotic, not overly casual. Appropriate tone for the situation.
+6. **Response Quality** (0-10): SCORE THIS STRICTLY. Were responses concise, well-structured, and to the point? Did they avoid unnecessary filler? Were they easy for the customer to follow?
+7. **Proactiveness** (0-10): Did the agent follow up to confirm resolution, offer additional help, or suggest useful features? Did they ask for a review?
+8. **Process Compliance** (0-10): Did the agent follow CS process correctly? Did they escalate when needed instead of handling out of scope? Did they avoid making unauthorized promises (refunds, feature commitments)? Did they avoid sharing incorrect policies?
 
 ## IMPORTANT: Output format
 At the END of your evaluation, add this exact line:
-SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, language=X, product_knowledge=X, quality=X
+SCORES: communication=X, problem_understanding=X, troubleshooting=X, product_knowledge=X, language_tone=X, response_quality=X, proactiveness=X, process_compliance=X
 
 ## IMPORTANT: Context-aware scoring
 Not every conversation requires all 8 steps to be perfect. Score based on what's appropriate for the specific scenario:
@@ -647,16 +644,16 @@ def api_end_session():
                 "persona": persona["name"],
                 "turns": sess["turn_count"],
                 "grader": "groq",
-                "score_greeting": scores.get("greeting"),
-                "score_empathy": scores.get("empathy"),
-                "score_probing": scores.get("probing"),
-                "score_expectation": scores.get("expectation"),
-                "score_troubleshoot": scores.get("troubleshoot"),
-                "score_followup": scores.get("followup"),
-                "score_achieve_more": scores.get("achieve_more"),
-                "score_farewell": scores.get("farewell"),
-                "score_tone": scores.get("language", scores.get("tone")),
-                "score_quality": scores.get("quality"),
+                "score_greeting": scores.get("communication"),
+                "score_empathy": scores.get("problem_understanding"),
+                "score_probing": scores.get("troubleshooting"),
+                "score_expectation": scores.get("product_knowledge"),
+                "score_troubleshoot": scores.get("language_tone"),
+                "score_followup": scores.get("response_quality"),
+                "score_achieve_more": scores.get("proactiveness"),
+                "score_farewell": scores.get("process_compliance"),
+                "score_tone": None,
+                "score_quality": None,
                 "overall_score": overall,
                 "conversation": messages_for_save,
                 "feedback": grading_text,
@@ -706,16 +703,24 @@ def api_results():
             query = query.eq("agent_name", agent_name)
         data = query.execute().data or []
 
+        # Column-to-criteria mapping (reusing existing DB columns)
+        col_to_criteria = {
+            "greeting": "communication",
+            "empathy": "problem_understanding",
+            "probing": "troubleshooting",
+            "expectation": "product_knowledge",
+            "troubleshoot": "language_tone",
+            "followup": "response_quality",
+            "achieve_more": "proactiveness",
+            "farewell": "process_compliance",
+        }
         results = []
         for row in data:
             scores = {}
-            for key in ["greeting", "empathy", "probing", "expectation", "troubleshoot",
-                         "followup", "achieve_more", "farewell", "tone", "quality"]:
-                val = row.get(f"score_{key}")
+            for col, criteria_key in col_to_criteria.items():
+                val = row.get(f"score_{col}")
                 if val is not None:
-                    # Map tone column back to language for new scoring
-                    mapped_key = "language" if key == "tone" else key
-                    scores[mapped_key] = val
+                    scores[criteria_key] = val
             results.append({
                 "timestamp": row.get("created_at", ""),
                 "agent": row.get("agent_name", "Anonymous"),

@@ -1074,9 +1074,10 @@ function showScoreResult(data) {
     `${capitalize(STATE.sessionScenario?.difficulty || '')} · ${STATE.sessionScenario?.category || ''} · ${STATE.turnCount} turns`;
 
   const labels = {
-    greeting:'Greeting', empathy:'Empathy', probing:'Probing', expectation:'Expectation',
-    troubleshoot:'Troubleshoot', followup:'Follow-up', achieve_more:'Achieve More',
-    farewell:'Farewell', language:'Language', product_knowledge:'Product Knowledge', quality:'Quality'
+    communication:'Communication', problem_understanding:'Problem Understanding',
+    troubleshooting:'Troubleshooting', product_knowledge:'Product Knowledge',
+    language_tone:'Language & Tone', response_quality:'Response Quality',
+    proactiveness:'Proactiveness', process_compliance:'Process Compliance'
   };
 
   const breakdown = document.getElementById('score-breakdown');
@@ -1138,9 +1139,10 @@ function showConversationReview(data) {
   // Right column: feedback
   const fbCol = document.getElementById('review-feedback-col');
   const scoreLabels = {
-    greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',
-    troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',
-    farewell:'Farewell',language:'Language',product_knowledge:'Product Knowledge',quality:'Quality'
+    communication:'Communication',problem_understanding:'Problem Understanding',
+    troubleshooting:'Troubleshooting',product_knowledge:'Product Knowledge',
+    language_tone:'Language & Tone',response_quality:'Response Quality',
+    proactiveness:'Proactiveness',process_compliance:'Process Compliance'
   };
 
   let fbHtml = '';
@@ -1254,8 +1256,8 @@ function renderDashboard(results) {
   document.getElementById('stat-turns').textContent = avgTurns;
 
   // Score bars
-  const criteria = ['greeting','empathy','probing','expectation','troubleshoot','followup','achieve_more','farewell','language','product_knowledge','quality'];
-  const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',language:'Language',product_knowledge:'Product Knowledge',quality:'Quality'};
+  const criteria = ['communication','problem_understanding','troubleshooting','product_knowledge','language_tone','response_quality','proactiveness','process_compliance'];
+  const labels = {communication:'Communication',problem_understanding:'Problem Understanding',troubleshooting:'Troubleshooting',product_knowledge:'Product Knowledge',language_tone:'Language & Tone',response_quality:'Response Quality',proactiveness:'Proactiveness',process_compliance:'Process Compliance'};
 
   const barsEl = document.getElementById('dash-score-bars');
   const criteriaAvgs = {};
@@ -1281,17 +1283,14 @@ function renderDashboard(results) {
   } else {
     const sorted = Object.entries(criteriaAvgs).sort((a,b) => a[1] - b[1]);
     const tips = {
-      greeting: 'Start with a warm greeting and introduce yourself by name',
-      empathy: 'Acknowledge the customer\'s frustration before jumping to solutions',
-      probing: 'Ask specific questions to understand the root cause — don\'t assume',
-      expectation: 'Tell the customer what you\'ll do next and estimated time',
-      troubleshoot: 'Provide clear step-by-step instructions with specific navigation paths',
-      followup: 'Always confirm the issue is resolved before closing',
-      achieve_more: 'Proactively suggest related features or offer additional help',
-      farewell: 'Thank the customer warmly and ask for a review',
-      language: 'Check grammar, spelling, punctuation. Write naturally — avoid robotic or overly formal tone',
-      product_knowledge: 'Learn app features thoroughly. Provide accurate, specific information',
-      quality: 'Be concise and accurate. Use links and screenshots when helpful',
+      communication: 'Greet warmly, show empathy, and close with a proper farewell + review request',
+      problem_understanding: 'Ask specific questions to understand the root cause before jumping to solutions',
+      troubleshooting: 'Provide clear, step-by-step instructions with specific navigation paths',
+      product_knowledge: 'Learn app features, settings, plans thoroughly. Use correct feature names and paths',
+      language_tone: 'Check grammar & spelling. Write naturally and professionally — avoid robotic tone',
+      response_quality: 'Keep responses concise and well-structured. Get to the point quickly',
+      proactiveness: 'Follow up to confirm resolution, offer additional help, suggest useful features',
+      process_compliance: 'Follow CS process — escalate when needed, don\'t promise refunds or features',
     };
     const worst3 = sorted.slice(0, 3);
     improveEl.innerHTML = worst3.map(([key, avg]) => {
@@ -1546,7 +1545,7 @@ function buildTranscriptMd(data) {
 
   if (scores && Object.keys(scores).length) {
     md += `## Scores\n\n`;
-    const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',language:'Language',product_knowledge:'Product Knowledge',quality:'Quality'};
+    const labels = {communication:'Communication',problem_understanding:'Problem Understanding',troubleshooting:'Troubleshooting',product_knowledge:'Product Knowledge',language_tone:'Language & Tone',response_quality:'Response Quality',proactiveness:'Proactiveness',process_compliance:'Process Compliance'};
     for (const [k, v] of Object.entries(scores)) {
       md += `- **${labels[k] || k}:** ${v}/10\n`;
     }
