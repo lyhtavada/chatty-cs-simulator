@@ -512,6 +512,20 @@ def api_send_message():
 
     sess["history"].append({"role": "assistant", "content": customer_reply})
 
+    # Detect customer satisfaction signals
+    satisfaction_keywords = [
+        "thank", "thanks", "that works", "that helped", "solved", "perfect",
+        "great", "awesome", "got it", "understood", "appreciate", "you're the best",
+        "issue is resolved", "working now", "fixed", "no more questions",
+        "that's all", "nothing else", "all good", "no problem now",
+    ]
+    reply_lower = customer_reply.lower()
+    customer_satisfied = any(kw in reply_lower for kw in satisfaction_keywords)
+
+    # Max turns limit
+    max_turns = 15
+    force_end = sess["turn_count"] >= max_turns
+
     # Guided step hint
     turn = sess["turn_count"]
     guided_step = min(turn, len(LIVECHAT_STEPS) - 1)
@@ -534,6 +548,8 @@ def api_send_message():
         "customer_reply": customer_reply,
         "turn_count": sess["turn_count"],
         "guided_step": guided_step,
+        "customer_satisfied": customer_satisfied,
+        "force_end": force_end,
     })
 
 
