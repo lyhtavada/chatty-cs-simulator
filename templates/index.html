@@ -287,6 +287,15 @@
   .history-dl{font-size:11px;padding:3px 8px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;color:var(--gray-400);cursor:pointer;font-family:var(--font);opacity:0;transition:opacity .15s}
   .history-item:hover .history-dl{opacity:1}
   .history-dl:hover{border-color:var(--blue-200);color:var(--blue-600)}
+  .history-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .history-sort-select,.history-size-select{font-size:11px;padding:3px 8px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;color:var(--gray-600);cursor:pointer;font-family:var(--font)}
+  .history-sort-select:focus,.history-size-select:focus{outline:none;border-color:var(--blue-300)}
+  .history-pagination{display:flex;align-items:center;gap:4px;padding:12px 0 2px;justify-content:center}
+  .pg-btn{font-size:12px;padding:4px 9px;border-radius:var(--radius-sm);border:1px solid var(--gray-200);background:#fff;color:var(--gray-600);cursor:pointer;font-family:var(--font);transition:all .15s}
+  .pg-btn:hover:not(:disabled){border-color:var(--blue-300);color:var(--blue-600);background:var(--blue-50)}
+  .pg-btn.active{border-color:var(--blue-400);background:var(--blue-600);color:#fff;font-weight:600}
+  .pg-btn:disabled{opacity:.4;cursor:default}
+  .pg-info{font-size:11px;color:var(--gray-400);padding:0 6px}
 
   /* Suggested answer in review */
   .review-suggestion{margin-top:4px;padding:8px 12px;background:var(--green-bg);border:1px solid #c6f0d8;border-radius:8px;font-size:12px;color:var(--green-text);line-height:1.5;cursor:pointer;transition:all .15s}
@@ -565,13 +574,24 @@
       </div>
       <div class="dash-row">
         <div class="dash-card" style="grid-column:1/-1">
-          <div class="dash-card-title" style="display:flex;align-items:center;justify-content:space-between">
+          <div class="dash-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             Recent sessions
-            <div class="dash-dl-bar" style="margin:0">
+            <div class="history-controls">
+              <select class="history-sort-select" id="history-sort" onchange="renderHistoryPage()">
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+              <select class="history-size-select" id="history-page-size" onchange="renderHistoryPage(1)">
+                <option value="5">5 / page</option>
+                <option value="10" selected>10 / page</option>
+                <option value="25">25 / page</option>
+                <option value="50">50 / page</option>
+              </select>
               <button class="btn-dl" onclick="downloadAllTranscripts()">📥 Download All</button>
             </div>
           </div>
           <div class="history-list" id="dash-history"></div>
+          <div class="history-pagination" id="history-pagination"></div>
         </div>
       </div>
     </div>
@@ -1430,12 +1450,39 @@ function renderDashboard(results) {
     }).join('');
   }
 
-  // History with View + Download buttons
+  // History pagination state
+  STATE.historyCurrentPage = 1;
+  renderHistoryPage();
+}
+
+function renderHistoryPage(page) {
+  const results = STATE.dashResults || [];
+  const sort = document.getElementById('history-sort')?.value || 'newest';
+  const pageSize = parseInt(document.getElementById('history-page-size')?.value || '10');
+
+  // Sort
+  const sorted = [...results].sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return sort === 'newest' ? tb - ta : ta - tb;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  if (page !== undefined) STATE.historyCurrentPage = page;
+  // clamp
+  if (STATE.historyCurrentPage > totalPages) STATE.historyCurrentPage = totalPages;
+  if (STATE.historyCurrentPage < 1) STATE.historyCurrentPage = 1;
+  const currentPage = STATE.historyCurrentPage;
+
+  const start = (currentPage - 1) * pageSize;
+  const pageItems = sorted.slice(start, start + pageSize);
+
   const histEl = document.getElementById('dash-history');
-  const recent = results.slice(0, 15);
-  if (!recent.length) { histEl.innerHTML = '<div style="color:var(--gray-400);font-size:13px;padding:10px 0">No sessions yet</div>'; }
-  else {
-    histEl.innerHTML = recent.map((r, idx) => {
+  if (!sorted.length) {
+    histEl.innerHTML = '<div style="color:var(--gray-400);font-size:13px;padding:10px 0">No sessions yet</div>';
+  } else {
+    histEl.innerHTML = pageItems.map((r) => {
+      const idx = results.indexOf(r); // original index for view/download
       const score = r.overall || 0;
       let sCls = 's-high'; if(score<5) sCls='s-low'; else if(score<7) sCls='s-mid';
       const ts = r.timestamp ? new Date(r.timestamp).toLocaleDateString() : '';
@@ -1449,6 +1496,26 @@ function renderDashboard(results) {
       </div>`;
     }).join('');
   }
+
+  // Render pagination nav
+  const pagEl = document.getElementById('history-pagination');
+  if (totalPages <= 1) { pagEl.innerHTML = ''; return; }
+
+  const maxVisible = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+  let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+  if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+  let btns = '';
+  btns += `<button class="pg-btn" onclick="renderHistoryPage(${currentPage - 1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  if (startPage > 1) btns += `<button class="pg-btn" onclick="renderHistoryPage(1)">1</button>${startPage > 2 ? '<span class="pg-info">…</span>' : ''}`;
+  for (let i = startPage; i <= endPage; i++) {
+    btns += `<button class="pg-btn ${i===currentPage?'active':''}" onclick="renderHistoryPage(${i})">${i}</button>`;
+  }
+  if (endPage < totalPages) btns += `${endPage < totalPages - 1 ? '<span class="pg-info">…</span>' : ''}<button class="pg-btn" onclick="renderHistoryPage(${totalPages})">${totalPages}</button>`;
+  btns += `<button class="pg-btn" onclick="renderHistoryPage(${currentPage + 1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+  btns += `<span class="pg-info">${start + 1}–${Math.min(start + pageSize, sorted.length)} of ${sorted.length}</span>`;
+  pagEl.innerHTML = btns;
 }
 
 // ══════════════════════════════════════════════
