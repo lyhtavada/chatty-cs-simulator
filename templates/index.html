@@ -1034,7 +1034,7 @@ function showScoreResult(data) {
   const labels = {
     greeting:'Greeting', empathy:'Empathy', probing:'Probing', expectation:'Expectation',
     troubleshoot:'Troubleshoot', followup:'Follow-up', achieve_more:'Achieve More',
-    farewell:'Farewell', tone:'Tone', quality:'Quality'
+    farewell:'Farewell', language:'Language', product_knowledge:'Product Knowledge', quality:'Quality'
   };
 
   const breakdown = document.getElementById('score-breakdown');
@@ -1186,8 +1186,8 @@ function renderDashboard(results) {
   document.getElementById('stat-turns').textContent = avgTurns;
 
   // Score bars
-  const criteria = ['greeting','empathy','probing','expectation','troubleshoot','followup','achieve_more','farewell','tone','quality'];
-  const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',tone:'Tone',quality:'Quality'};
+  const criteria = ['greeting','empathy','probing','expectation','troubleshoot','followup','achieve_more','farewell','language','product_knowledge','quality'];
+  const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',language:'Language',product_knowledge:'Product Knowledge',quality:'Quality'};
 
   const barsEl = document.getElementById('dash-score-bars');
   const criteriaAvgs = {};
@@ -1221,7 +1221,8 @@ function renderDashboard(results) {
       followup: 'Always confirm the issue is resolved before closing',
       achieve_more: 'Proactively suggest related features or offer additional help',
       farewell: 'Thank the customer warmly and ask for a review',
-      tone: 'Keep a friendly, professional tone throughout — avoid robotic responses',
+      language: 'Check grammar, spelling, punctuation. Write naturally — avoid robotic or overly formal tone',
+      product_knowledge: 'Learn app features thoroughly. Provide accurate, specific information',
       quality: 'Be concise and accurate. Use links and screenshots when helpful',
     };
     const worst3 = sorted.slice(0, 3);
@@ -1477,7 +1478,7 @@ function buildTranscriptMd(data) {
 
   if (scores && Object.keys(scores).length) {
     md += `## Scores\n\n`;
-    const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',tone:'Tone',quality:'Quality'};
+    const labels = {greeting:'Greeting',empathy:'Empathy',probing:'Probing',expectation:'Expectation',troubleshoot:'Troubleshoot',followup:'Follow-up',achieve_more:'Achieve More',farewell:'Farewell',language:'Language',product_knowledge:'Product Knowledge',quality:'Quality'};
     for (const [k, v] of Object.entries(scores)) {
       md += `- **${labels[k] || k}:** ${v}/10\n`;
     }

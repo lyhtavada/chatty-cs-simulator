@@ -231,12 +231,13 @@ Evaluate the CS agent's performance in this practice live chat session.
 6. **Follow-up** (0-10): Did they confirm resolution?
 7. **Achieve More** (0-10): Did they offer additional help?
 8. **Farewell & Review** (0-10): Did they thank and ask for review?
-9. **Tone & Professionalism** (0-10): Friendly, professional, appropriate?
-10. **Response Quality** (0-10): Clear, concise, accurate?
+9. **Language** (0-10): Grammar, spelling, punctuation, tone, writing style — natural and professional, not robotic?
+10. **Product Knowledge** (0-10): Was the information about the app/features accurate and specific?
+11. **Response Quality** (0-10): Clear, concise, well-structured responses?
 
 ## IMPORTANT: Output format
 At the END of your evaluation, add this exact line:
-SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, tone=X, quality=X
+SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, language=X, product_knowledge=X, quality=X
 
 Also provide 3 specific, actionable tips for improvement.
 Overall: 9-10 Excellent, 7-8 Good, 5-6 Needs Work, <5 Re-train.
@@ -627,7 +628,7 @@ def api_end_session():
                 "score_followup": scores.get("followup"),
                 "score_achieve_more": scores.get("achieve_more"),
                 "score_farewell": scores.get("farewell"),
-                "score_tone": scores.get("tone"),
+                "score_tone": scores.get("language", scores.get("tone")),
                 "score_quality": scores.get("quality"),
                 "overall_score": overall,
                 "conversation": messages_for_save,
@@ -684,7 +685,9 @@ def api_results():
                          "followup", "achieve_more", "farewell", "tone", "quality"]:
                 val = row.get(f"score_{key}")
                 if val is not None:
-                    scores[key] = val
+                    # Map tone column back to language for new scoring
+                    mapped_key = "language" if key == "tone" else key
+                    scores[mapped_key] = val
             results.append({
                 "timestamp": row.get("created_at", ""),
                 "agent": row.get("agent_name", "Anonymous"),
