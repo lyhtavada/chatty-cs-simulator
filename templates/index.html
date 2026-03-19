@@ -480,10 +480,61 @@
       <div id="scenarios-grid" class="practice-grid"></div>
     </div>
 
+    <!-- Dashboard how it works modal -->
+    <div class="hiw-overlay hidden" id="hiw-overlay-dash" onclick="if(event.target===this)this.classList.add('hidden')">
+      <div class="hiw-modal">
+        <div class="hiw-close" onclick="document.getElementById('hiw-overlay-dash').classList.add('hidden')">&times;</div>
+        <div class="hiw-title">How it works</div>
+        <div class="hiw-sub">Understanding your dashboard &amp; scores</div>
+
+        <div class="hiw-section-label">Metrics</div>
+        <div class="hiw-steps">
+          <div class="hiw-step"><div class="hiw-step-num">📊</div><div class="hiw-step-text"><strong>Sessions</strong> — Total number of practice sessions completed</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">⭐</div><div class="hiw-step-text"><strong>Avg Score</strong> — Average score across all sessions (scale 1–10)</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">🏆</div><div class="hiw-step-text"><strong>Best Score</strong> — Your highest score achieved</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">💬</div><div class="hiw-step-text"><strong>Avg Turns</strong> — Average number of messages per session</div></div>
+        </div>
+
+        <div class="hiw-section-label">8 Scoring Criteria</div>
+        <div class="hiw-steps">
+          <div class="hiw-step"><div class="hiw-step-num">1</div><div class="hiw-step-text"><strong>Communication</strong> — Clear, concise, and well-structured responses</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">2</div><div class="hiw-step-text"><strong>Problem Understanding</strong> — Correctly identify the customer's issue</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">3</div><div class="hiw-step-text"><strong>Troubleshooting</strong> — Logical steps to investigate and resolve</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">4</div><div class="hiw-step-text"><strong>Product Knowledge</strong> — Accurate use of feature names, settings &amp; paths</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">5</div><div class="hiw-step-text"><strong>Language &amp; Tone</strong> — Friendly, professional, empathetic tone</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">6</div><div class="hiw-step-text"><strong>Response Quality</strong> — Relevant, accurate, and complete answers</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">7</div><div class="hiw-step-text"><strong>Proactiveness</strong> — Follow up, offer extra help, suggest useful features</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">8</div><div class="hiw-step-text"><strong>Process Compliance</strong> — Follow the CS process, escalate when needed</div></div>
+        </div>
+
+        <div class="hiw-section-label">Live Chat Process (8 Steps)</div>
+        <div class="hiw-steps">
+          <div class="hiw-step"><div class="hiw-step-num">1</div><div class="hiw-step-text"><strong>Greeting</strong> — Politely greet and introduce yourself</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">2</div><div class="hiw-step-text"><strong>Show Empathy</strong> — Acknowledge the customer's situation</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">3</div><div class="hiw-step-text"><strong>Probing</strong> — Ask specific questions to understand the root issue</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">4</div><div class="hiw-step-text"><strong>Set Expectation</strong> — Inform about next steps and estimated time</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">5</div><div class="hiw-step-text"><strong>Troubleshoot</strong> — Investigate, analyze, and propose the best solution</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">6</div><div class="hiw-step-text"><strong>Update &amp; Follow Up</strong> — Inform the result, ask customer to verify</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">7</div><div class="hiw-step-text"><strong>Achieve More</strong> — Proactively offer additional help or features</div></div>
+          <div class="hiw-step"><div class="hiw-step-num">8</div><div class="hiw-step-text"><strong>Farewell &amp; Ask for Review</strong> — Thank and request a review (mandatory)</div></div>
+        </div>
+
+        <div class="hiw-section-label">Score Colors</div>
+        <table class="hiw-diff-table">
+          <thead><tr><th>Range</th><th>Level</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><span class="hiw-diff-dot easy"></span><span class="hiw-diff-label easy">7 – 10</span></td><td>Good</td><td>Strong performance, keep it up</td></tr>
+            <tr><td><span class="hiw-diff-dot medium"></span><span class="hiw-diff-label medium">4 – 6.9</span></td><td>Needs work</td><td>Room for improvement</td></tr>
+            <tr><td><span class="hiw-diff-dot hard"></span><span class="hiw-diff-label hard">1 – 3.9</span></td><td>Critical</td><td>Focus on this area</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Dashboard page -->
     <div class="page hidden" id="page-dashboard">
       <div class="page-header">
-        <div class="page-title">📊 Dashboard</div>
+        <div class="page-title">📊 Dashboard <span class="hiw-trigger" onclick="document.getElementById('hiw-overlay-dash').classList.remove('hidden')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> How it works</span></div>
         <div style="display:flex;align-items:center;gap:16px;margin-top:4px">
           <p class="page-desc" id="dash-desc" style="margin:0">Track your progress and improvement</p>
           <div id="dash-agent-filter" style="display:none">
