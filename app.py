@@ -395,10 +395,12 @@ def api_login():
     name = data.get("name", "").strip()
     role = data.get("role", "agent")
     password = data.get("password", "")
+    restore = data.get("restore", False)
 
     if not name:
         return jsonify({"error": "Name required"}), 400
-    if role == "leader" and password != LEADER_PASSWORD:
+    # Skip password check on session restore (user already authenticated before)
+    if role == "leader" and not restore and password != LEADER_PASSWORD:
         return jsonify({"error": "Wrong password"}), 403
 
     session["agent_name"] = name

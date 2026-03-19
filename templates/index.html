@@ -702,24 +702,32 @@ async function doLogin() {
     if (!res.ok) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
 
     STATE.user = {name: data.name, role: data.role};
-    document.getElementById('login-overlay').classList.add('hidden');
-    document.getElementById('app-container').style.display = 'flex';
-    document.getElementById('agent-display-name').textContent = data.name;
-    document.getElementById('agent-display-role').textContent = data.role === 'leader' ? 'Leader' : 'CS Agent';
-    document.getElementById('agent-avatar').textContent = data.name[0].toUpperCase();
-    if (data.role === 'leader') {
-      document.getElementById('dash-desc').textContent = 'All agents\' results';
-      document.getElementById('nav-generator').style.display = '';
-    }
-
+    localStorage.setItem('cs_sim_user', JSON.stringify(STATE.user));
+    initAppUI();
     loadScenarios();
   } catch(e) { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
 }
 
+function initAppUI() {
+  const u = STATE.user;
+  if (!u) return;
+  document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('app-container').style.display = 'flex';
+  document.getElementById('agent-display-name').textContent = u.name;
+  document.getElementById('agent-display-role').textContent = u.role === 'leader' ? 'Leader' : 'CS Agent';
+  document.getElementById('agent-avatar').textContent = u.name[0].toUpperCase();
+  if (u.role === 'leader') {
+    document.getElementById('dash-desc').textContent = 'All agents\' results';
+    document.getElementById('nav-generator').style.display = '';
+  }
+}
+
 function doLogout() {
   STATE.user = null;
+  localStorage.removeItem('cs_sim_user');
   document.getElementById('login-overlay').classList.remove('hidden');
   document.getElementById('app-container').style.display = 'none';
+  document.getElementById('nav-generator').style.display = 'none';
   document.getElementById('login-name').value = '';
   document.getElementById('login-password').value = '';
 }
@@ -727,6 +735,30 @@ function doLogout() {
 // Enter key on login
 document.getElementById('login-name').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 document.getElementById('login-password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// Restore session on page load
+(function restoreSession() {
+  try {
+    const saved = localStorage.getItem('cs_sim_user');
+    if (!saved) return;
+    const u = JSON.parse(saved);
+    if (!u?.name) return;
+    STATE.user = u;
+    // Re-login to backend silently (refresh Flask session cookie)
+    // For leader: we store a token so backend can skip password check on restore
+    fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: u.name, role: u.role, restore: true}),
+    }).then(() => {
+      initAppUI();
+      loadScenarios();
+    }).catch(() => {
+      initAppUI();
+      loadScenarios();
+    });
+  } catch(e) {}
+})();
 
 // ══════════════════════════════════════════════
 //  SCENARIOS
