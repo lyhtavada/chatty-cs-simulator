@@ -245,23 +245,24 @@ Not every conversation requires all 8 steps to be perfect. Score based on what's
 
 Overall: 9-10 Excellent, 7-8 Good, 5-6 Needs Work, <5 Re-train.
 
-## Output Structure
-After your evaluation, output in this EXACT order:
+## MANDATORY Output Structure
+You MUST output ALL 3 sections below in this EXACT order and format. Do NOT skip any section.
 
-### 1. Tips for improvement (3 specific, actionable tips)
-TIPS:
-TIP_1: <first tip>
-TIP_2: <second tip>
-TIP_3: <third tip>
+### Section 1: SCORES (one line, this exact format)
+SCORES: communication=X, problem_understanding=X, troubleshooting=X, product_knowledge=X, language_tone=X, response_quality=X, proactiveness=X, process_compliance=X
 
-### 2. Scores
-SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followup=X, achieve_more=X, farewell=X, language=X, product_knowledge=X, quality=X
+### Section 2: TIPS (exactly 3 lines)
+TIP_1: <first actionable improvement tip>
+TIP_2: <second actionable improvement tip>
+TIP_3: <third actionable improvement tip>
 
-### 3. Suggested better responses
-For EACH CS agent message, provide a better version:
-SUGGESTED_1: <improved version of agent's 1st message>
-SUGGESTED_2: <improved version of agent's 2nd message>
-... and so on. Keep suggestions concise. If already good, still provide a slightly improved version.
+### Section 3: SUGGESTED better responses (one line per CS agent message)
+SUGGESTED_1: <better version of agent's 1st message>
+SUGGESTED_2: <better version of agent's 2nd message>
+SUGGESTED_3: <better version of agent's 3rd message>
+(continue for ALL agent messages in the conversation)
+
+CRITICAL: You MUST include ALL 3 sections. Do NOT use bullet points or other formats — use the exact prefixes shown (SCORES:, TIP_1:, SUGGESTED_1: etc).
 """
 
 
@@ -281,16 +282,20 @@ def parse_scores(grading_text: str) -> dict:
 def parse_suggestions(grading_text: str) -> list[str]:
     """Parse SUGGESTED_N: lines from grading output."""
     suggestions = []
-    for m in re.finditer(r"SUGGESTED_\d+:\s*(.+)", grading_text):
-        suggestions.append(m.group(1).strip())
+    for m in re.finditer(r"SUGGESTED[_\s]*\d+\s*[:\.]\s*(.+)", grading_text, re.IGNORECASE):
+        text = m.group(1).strip().strip('"').strip("'")
+        if text:
+            suggestions.append(text)
     return suggestions
 
 
 def parse_tips(grading_text: str) -> list[str]:
     """Parse TIP_N: lines from grading output."""
     tips = []
-    for m in re.finditer(r"TIP_\d+:\s*(.+)", grading_text):
-        tips.append(m.group(1).strip())
+    for m in re.finditer(r"TIP[_\s]*\d+\s*[:\.]\s*(.+)", grading_text, re.IGNORECASE):
+        text = m.group(1).strip().strip('"').strip("'")
+        if text:
+            tips.append(text)
     return tips
 
 
@@ -621,7 +626,7 @@ def api_end_session():
                     )},
                 ],
                 temperature=0.3,
-                max_tokens=2048,
+                max_tokens=4096,
             )
             grading_text = response.choices[0].message.content or grading_text
         except Exception as e:
