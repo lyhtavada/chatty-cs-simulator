@@ -240,6 +240,14 @@ SCORES: greeting=X, empathy=X, probing=X, expectation=X, troubleshoot=X, followu
 
 Also provide 3 specific, actionable tips for improvement.
 Overall: 9-10 Excellent, 7-8 Good, 5-6 Needs Work, <5 Re-train.
+
+## Suggested Responses
+After the SCORES line, for EACH CS agent message in the conversation, provide a suggested better response.
+Use this exact format (one block per CS agent message, numbered starting from 1):
+SUGGESTED_1: <A better version of the agent's 1st message>
+SUGGESTED_2: <A better version of the agent's 2nd message>
+... and so on for each agent message.
+Keep suggestions concise and professional. If the agent's message was already good, still provide a slightly improved version.
 """
 
 
@@ -254,6 +262,14 @@ def parse_scores(grading_text: str) -> dict:
             key = m.group(1).strip().lower().replace(" ", "_").replace("&", "and")
             scores[key] = float(m.group(2))
     return scores
+
+
+def parse_suggestions(grading_text: str) -> list[str]:
+    """Parse SUGGESTED_N: lines from grading output."""
+    suggestions = []
+    for m in re.finditer(r"SUGGESTED_\d+:\s*(.+)", grading_text):
+        suggestions.append(m.group(1).strip())
+    return suggestions
 
 
 # --- Cache scenarios ---
@@ -572,6 +588,7 @@ def api_end_session():
             grading_text = f"Grading error: {e}"
 
     scores = parse_scores(grading_text)
+    suggestions = parse_suggestions(grading_text)
     overall = round(sum(scores.values()) / len(scores), 1) if scores else 0
 
     # Save to Supabase
@@ -613,6 +630,7 @@ def api_end_session():
         "overall": overall,
         "turns": sess["turn_count"],
         "conversation": messages_for_save,
+        "suggestions": suggestions,
     })
 
 
