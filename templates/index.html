@@ -484,7 +484,14 @@
     <div class="page hidden" id="page-dashboard">
       <div class="page-header">
         <div class="page-title">📊 Dashboard</div>
-        <p class="page-desc" id="dash-desc">Track your progress and improvement</p>
+        <div style="display:flex;align-items:center;gap:16px;margin-top:4px">
+          <p class="page-desc" id="dash-desc" style="margin:0">Track your progress and improvement</p>
+          <div id="dash-agent-filter" style="display:none">
+            <select class="field-select" id="dash-agent-select" onchange="filterDashboardByAgent()" style="min-width:160px;font-size:12px;padding:6px 28px 6px 10px">
+              <option value="">All agents</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div class="stat-grid">
         <div class="stat-card"><div class="stat-label">Sessions</div><div class="stat-value" id="stat-sessions">0</div></div>
@@ -1181,6 +1188,46 @@ function showConversationReview(data) {
     fbHtml += `</div>`;
   }
 
+  // 4. Leader view: CS gap analysis
+  if (STATE.user?.role === 'leader' && scores && Object.keys(scores).length) {
+    const scoreLabelsMap = scoreLabels;
+    const weakAreas = Object.entries(scores)
+      .filter(([, v]) => v < 7)
+      .sort((a, b) => a[1] - b[1]);
+
+    const leaderTips = {
+      communication: 'CS cần cải thiện cách chào hỏi, thể hiện empathy, và farewell. Nên luyện tập mở đầu/kết thúc conversation.',
+      problem_understanding: 'CS chưa hỏi đủ câu hỏi để hiểu root cause. Cần training thêm về probing questions và set expectations.',
+      troubleshooting: 'CS cần cải thiện khả năng hướng dẫn step-by-step. Nên review lại product knowledge docs.',
+      product_knowledge: 'CS thiếu kiến thức về sản phẩm — dùng sai tên feature, navigation paths. Cần training lại product knowledge.',
+      language_tone: 'CS cần cải thiện grammar, spelling, và tone. Nên review writing guidelines và practice natural writing.',
+      response_quality: 'Response của CS quá dài/lộn xộn. Cần training về concise writing và structured responses.',
+      proactiveness: 'CS chưa chủ động follow up, offer thêm help, hoặc suggest features. Cần nhắc nhở về achieve more + ask for review.',
+      process_compliance: 'CS không tuân thủ quy trình — có thể đã promise refund/features hoặc không escalate đúng cách. Cần review lại CS process.',
+    };
+
+    if (weakAreas.length) {
+      fbHtml += `<div style="border-top:2px solid var(--blue-100);padding-top:16px;margin-top:8px">
+        <div class="review-section-title" style="color:var(--blue-600)">Leader Notes — Areas CS Needs Improvement</div>`;
+      fbHtml += weakAreas.map(([key, val]) => {
+        const isLow = val < 5;
+        return `<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:10px;padding:10px 12px;background:${isLow ? 'var(--red-bg)' : 'var(--amber-bg)'};border-radius:var(--radius-sm)">
+          <div style="flex-shrink:0;font-size:14px">${isLow ? '🔴' : '🟡'}</div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600;color:${isLow ? 'var(--red-text)' : 'var(--amber-text)'};margin-bottom:2px">${scoreLabelsMap[key] || key} — ${val}/10</div>
+            <div style="font-size:12px;color:var(--gray-600);line-height:1.5">${leaderTips[key] || 'Cần cải thiện ở mục này.'}</div>
+          </div>
+        </div>`;
+      }).join('');
+      fbHtml += `</div>`;
+    } else {
+      fbHtml += `<div style="border-top:2px solid var(--green-bg);padding-top:16px;margin-top:8px">
+        <div class="review-section-title" style="color:var(--green-text)">Leader Notes</div>
+        <div style="font-size:12px;color:var(--green-text);padding:10px 12px;background:var(--green-bg);border-radius:var(--radius-sm)">✅ CS đạt điểm tốt ở tất cả các tiêu chí (≥ 7/10). Không có vấn đề cần cải thiện.</div>
+      </div>`;
+    }
+  }
+
   if (!fbHtml) {
     fbHtml = '<div style="color:var(--gray-400);font-size:13px;padding:20px">No feedback available</div>';
   }
@@ -1238,8 +1285,34 @@ async function loadDashboard() {
       : `/api/results?agent=${encodeURIComponent(STATE.user?.name || '')}`;
     const res = await fetch(url);
     const results = await res.json();
-    if (Array.isArray(results)) renderDashboard(results);
+    if (!Array.isArray(results)) return;
+
+    STATE.allDashResults = results; // keep unfiltered copy for leader filter
+
+    // Show agent filter for leaders
+    const filterEl = document.getElementById('dash-agent-filter');
+    if (STATE.user?.role === 'leader') {
+      filterEl.style.display = '';
+      const selectEl = document.getElementById('dash-agent-select');
+      const currentVal = selectEl.value;
+      const agents = [...new Set(results.map(r => r.agent).filter(Boolean))].sort();
+      selectEl.innerHTML = '<option value="">All agents</option>' +
+        agents.map(a => `<option value="${escHtml(a)}" ${a === currentVal ? 'selected' : ''}>${escHtml(a)}</option>`).join('');
+      // Apply filter if one was selected
+      const filtered = currentVal ? results.filter(r => r.agent === currentVal) : results;
+      renderDashboard(filtered);
+    } else {
+      filterEl.style.display = 'none';
+      renderDashboard(results);
+    }
   } catch(e) { console.error('Dashboard load error', e); }
+}
+
+function filterDashboardByAgent() {
+  const agent = document.getElementById('dash-agent-select').value;
+  const all = STATE.allDashResults || [];
+  const filtered = agent ? all.filter(r => r.agent === agent) : all;
+  renderDashboard(filtered);
 }
 
 function renderDashboard(results) {
@@ -1512,6 +1585,28 @@ async function deleteCustom(id) {
 // ══════════════════════════════════════════════
 //  VIEW HISTORY SESSION
 // ══════════════════════════════════════════════
+function parseTipsFromFeedback(feedback) {
+  const tips = [];
+  const re = /TIP[_\s]*\d+\s*[:.]\s*(.+)/gi;
+  let m;
+  while ((m = re.exec(feedback)) !== null) {
+    const t = m[1].trim().replace(/^["']|["']$/g, '');
+    if (t) tips.push(t);
+  }
+  return tips;
+}
+
+function parseSuggestionsFromFeedback(feedback) {
+  const suggestions = [];
+  const re = /SUGGESTED[_\s]*\d+\s*[:.]\s*(.+)/gi;
+  let m;
+  while ((m = re.exec(feedback)) !== null) {
+    const t = m[1].trim().replace(/^["']|["']$/g, '');
+    if (t) suggestions.push(t);
+  }
+  return suggestions;
+}
+
 function viewHistorySession(idx) {
   const r = STATE.dashResults[idx];
   if (!r) return;
@@ -1519,10 +1614,12 @@ function viewHistorySession(idx) {
     role: m.role === 'agent' ? 'agent' : 'customer',
     text: m.content || m.text || ''
   }));
+  const feedback = r.feedback || '';
   showConversationReview({
     conversation,
-    feedback: r.feedback || '',
-    suggestions: [],
+    feedback,
+    tips: parseTipsFromFeedback(feedback),
+    suggestions: parseSuggestionsFromFeedback(feedback),
     scenario: {difficulty: r.difficulty, category: r.category, intent: r.intent},
     persona: r.persona || 'Customer',
     scores: r.scores || {},
