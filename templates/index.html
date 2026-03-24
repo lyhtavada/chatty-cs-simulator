@@ -341,6 +341,19 @@
   .gen-save-bar .count{font-size:13px;color:var(--blue-800);flex:1}
   .gen-save-btn{padding:9px 20px;border-radius:var(--radius-sm);border:none;background:var(--blue-600);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer}
   .gen-save-btn:hover{background:var(--blue-800)}
+  /* Search box */
+  .search-box-wrap{position:relative;display:flex;align-items:center}
+  .search-icon{position:absolute;left:10px;color:var(--gray-400);pointer-events:none}
+  .search-box{padding:7px 12px 7px 30px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;color:var(--gray-900);background:#fff;outline:none;width:220px;transition:border-color .15s}
+  .search-box:focus{border-color:var(--blue-400);box-shadow:0 0 0 3px rgba(55,138,221,.1)}
+  /* Gen tabs */
+  .gen-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--gray-200);padding-bottom:0}
+  .gen-tab{padding:8px 16px;font-size:13px;font-weight:500;font-family:var(--font);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;color:var(--gray-500);margin-bottom:-1px;transition:color .15s,border-color .15s}
+  .gen-tab.active{color:var(--blue-600);border-bottom-color:var(--blue-600)}
+  .gen-tab:hover:not(.active){color:var(--gray-900)}
+  /* AI feedback */
+  .ai-feedback-text{white-space:pre-wrap;font-size:13px;line-height:1.75;color:var(--gray-800)}
+  .ai-feedback-text strong,.ai-feedback-text b{color:var(--gray-900);font-weight:600}
   .custom-list{margin-top:24px}
   .custom-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--gray-100);font-size:13px}
   .custom-item:last-child{border-bottom:none}
@@ -483,7 +496,13 @@
     <!-- Practice page -->
     <div class="page" id="page-practice">
       <div class="page-header">
-        <div class="page-title">💬 Practice <span class="hiw-trigger" onclick="document.getElementById('hiw-overlay').classList.remove('hidden')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> How it works</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div class="page-title">💬 Practice <span class="hiw-trigger" onclick="document.getElementById('hiw-overlay').classList.remove('hidden')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> How it works</span></div>
+          <div class="search-box-wrap">
+            <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search-box" id="scenario-search" type="text" placeholder="Search scenarios..." oninput="filterScenarios()" />
+          </div>
+        </div>
         <p class="page-desc">Choose a scenario below or hit Random to start practicing</p>
       </div>
       <div id="scenarios-grid" class="practice-grid"></div>
@@ -573,6 +592,24 @@
         </div>
       </div>
       <div class="dash-row">
+        <div class="dash-card" style="grid-column:1/-1" id="ai-feedback-card">
+          <div class="dash-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            AI Performance Feedback
+            <div style="display:flex;align-items:center;gap:10px">
+              <div id="feedback-agent-wrap" style="display:none">
+                <select class="history-sort-select" id="feedback-agent-select" style="min-width:140px;font-size:12px">
+                  <option value="">All agents</option>
+                </select>
+              </div>
+              <button class="gen-btn" id="feedback-gen-btn" onclick="generateDashFeedback()" style="height:32px;padding:0 14px;font-size:12px">✨ Generate Feedback</button>
+            </div>
+          </div>
+          <div id="ai-feedback-content" style="margin-top:12px;font-size:13px;color:var(--gray-600);line-height:1.7">
+            <div style="color:var(--gray-400)">Click "Generate Feedback" to get an AI-powered analysis of performance.</div>
+          </div>
+        </div>
+      </div>
+      <div class="dash-row">
         <div class="dash-card" style="grid-column:1/-1">
           <div class="dash-card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             Recent sessions
@@ -603,30 +640,60 @@
         <p class="page-desc">Generate new training scenarios with AI — review and save the ones you like</p>
       </div>
 
-      <div class="gen-form">
-        <div class="gen-row">
+      <!-- Tabs -->
+      <div class="gen-tabs">
+        <button class="gen-tab active" id="tab-topic" onclick="switchGenTab('topic')">Generate from Topic</button>
+        <button class="gen-tab" id="tab-transcript" onclick="switchGenTab('transcript')">Import from Transcript</button>
+      </div>
+
+      <!-- Topic tab -->
+      <div id="gentab-topic">
+        <div class="gen-form">
+          <div class="gen-row">
+            <div class="field-group">
+              <label class="field-label">Topic / Description</label>
+              <input class="field-input" id="gen-topic" type="text" placeholder="e.g. AI chatbot not responding, billing refund request, WhatsApp integration setup..." />
+            </div>
+            <div class="field-group" style="max-width:100px">
+              <label class="field-label">Count</label>
+              <select class="field-select" id="gen-count">
+                <option value="3">3</option>
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+              </select>
+            </div>
+            <div class="field-group" style="max-width:120px">
+              <label class="field-label">Difficulty</label>
+              <select class="field-select" id="gen-difficulty">
+                <option value="">Any</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <button class="gen-btn" id="gen-btn" onclick="generateScenarios()">✨ Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transcript tab -->
+      <div id="gentab-transcript" style="display:none">
+        <div class="gen-form">
           <div class="field-group">
-            <label class="field-label">Topic / Description</label>
-            <input class="field-input" id="gen-topic" type="text" placeholder="e.g. AI chatbot not responding, billing refund request, WhatsApp integration setup..." />
+            <label class="field-label">Paste Crisp transcript</label>
+            <textarea class="field-input" id="transcript-input" rows="10" placeholder="Paste the full conversation transcript here (Crisp export, copy-paste from chat, etc.)..." style="resize:vertical;font-size:12px;line-height:1.6"></textarea>
           </div>
-          <div class="field-group" style="max-width:100px">
-            <label class="field-label">Count</label>
-            <select class="field-select" id="gen-count">
-              <option value="3">3</option>
-              <option value="5" selected>5</option>
-              <option value="10">10</option>
-            </select>
+          <div class="gen-row" style="margin-bottom:0">
+            <div class="field-group" style="max-width:140px;margin-bottom:0">
+              <label class="field-label">Scenarios to generate</label>
+              <select class="field-select" id="transcript-count">
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <button class="gen-btn" id="transcript-btn" onclick="generateFromTranscript()" style="align-self:flex-end">📋 Generate from Transcript</button>
           </div>
-          <div class="field-group" style="max-width:120px">
-            <label class="field-label">Difficulty</label>
-            <select class="field-select" id="gen-difficulty">
-              <option value="">Any</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-          <button class="gen-btn" id="gen-btn" onclick="generateScenarios()">✨ Generate</button>
         </div>
       </div>
 
@@ -858,9 +925,11 @@ function updateCategorySelect() {
 
 function filterScenarios() {
   STATE.category = document.getElementById('cat-select').value;
+  const query = (document.getElementById('scenario-search')?.value || '').toLowerCase().trim();
   const filtered = STATE.scenarios.filter(s => {
     if (s.difficulty !== STATE.difficulty) return false;
     if (STATE.category !== 'All' && s.category !== STATE.category) return false;
+    if (query && !s.opening_message.toLowerCase().includes(query) && !(s.category||'').toLowerCase().includes(query) && !(s.intent||'').toLowerCase().includes(query)) return false;
     return true;
   });
 
@@ -1394,6 +1463,18 @@ function renderDashboard(results) {
   const bestScore = scored.length ? Math.max(...scored.map(r => r.overall)).toFixed(1) : '—';
   const avgTurns = total ? Math.round(results.reduce((s,r) => s + (r.turns||0), 0) / total) : '—';
 
+  // Setup feedback card: leader gets agent selector, agent sees their own only
+  const feedbackAgentWrap = document.getElementById('feedback-agent-wrap');
+  const feedbackAgentSel = document.getElementById('feedback-agent-select');
+  if (STATE.user?.role === 'leader' && feedbackAgentWrap) {
+    feedbackAgentWrap.style.display = '';
+    const allAgents = [...new Set((STATE.allDashResults || results).map(r => r.agent).filter(Boolean))].sort();
+    feedbackAgentSel.innerHTML = '<option value="">All agents</option>' +
+      allAgents.map(a => `<option value="${escHtml(a)}">${escHtml(a)}</option>`).join('');
+  }
+  // Reset feedback content when re-rendering
+  document.getElementById('ai-feedback-content').innerHTML = '<div style="color:var(--gray-400)">Click "Generate Feedback" to get an AI-powered analysis of performance.</div>';
+
   document.getElementById('stat-sessions').textContent = total;
   document.getElementById('stat-avg').textContent = avgScore;
   document.getElementById('stat-best').textContent = bestScore;
@@ -1698,6 +1779,92 @@ async function deleteCustom(id) {
     loadCustomScenarios();
     loadScenarios();
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ══════════════════════════════════════════════
+//  IMPORT FROM TRANSCRIPT
+// ══════════════════════════════════════════════
+function switchGenTab(tab) {
+  document.getElementById('gentab-topic').style.display = tab === 'topic' ? '' : 'none';
+  document.getElementById('gentab-transcript').style.display = tab === 'transcript' ? '' : 'none';
+  document.getElementById('tab-topic').classList.toggle('active', tab === 'topic');
+  document.getElementById('tab-transcript').classList.toggle('active', tab === 'transcript');
+  document.getElementById('gen-results').innerHTML = '';
+  generatedScenarios = [];
+  selectedGenIds.clear();
+}
+
+async function generateFromTranscript() {
+  const transcript = document.getElementById('transcript-input').value.trim();
+  if (!transcript) { alert('Paste a transcript first'); return; }
+
+  const count = document.getElementById('transcript-count').value;
+  const btn = document.getElementById('transcript-btn');
+  const resultsEl = document.getElementById('gen-results');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div> Analyzing...';
+  resultsEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray-400)"><div class="loading-dots"><span></span><span></span><span></span></div><br>Analyzing transcript and generating scenarios...</div>';
+
+  try {
+    const res = await fetch('/api/scenarios/from-transcript', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({transcript, count: parseInt(count), app: 'chatty'}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      resultsEl.innerHTML = `<div style="color:var(--red-text);padding:20px">Error: ${data.error}</div>`;
+      return;
+    }
+    generatedScenarios = data.scenarios || [];
+    selectedGenIds = new Set(generatedScenarios.map((_, i) => i));
+    renderGeneratedScenarios();
+  } catch(e) {
+    resultsEl.innerHTML = `<div style="color:var(--red-text);padding:20px">Connection error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📋 Generate from Transcript';
+  }
+}
+
+// ══════════════════════════════════════════════
+//  AI DASHBOARD FEEDBACK
+// ══════════════════════════════════════════════
+async function generateDashFeedback() {
+  const btn = document.getElementById('feedback-gen-btn');
+  const contentEl = document.getElementById('ai-feedback-content');
+  const agentSelect = document.getElementById('feedback-agent-select');
+  const agent = agentSelect?.value || '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  contentEl.innerHTML = '<div style="color:var(--gray-400)">Analyzing performance data...</div>';
+
+  try {
+    const res = await fetch('/api/dashboard/feedback', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({agent: agent || null, app: 'chatty'}),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      contentEl.innerHTML = `<div style="color:var(--red-text)">${data.error}</div>`;
+      return;
+    }
+    // Render markdown-like bold formatting
+    const formatted = escHtml(data.feedback)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^(\d+\.\s+)/gm, '<br>$1')
+      .replace(/^(- )/gm, '<br>• ');
+    const scope = data.scope ? `<div style="font-size:11px;color:var(--gray-400);margin-bottom:10px">Analyzing: ${escHtml(data.scope)} · ${data.sessions} sessions</div>` : '';
+    contentEl.innerHTML = scope + `<div class="ai-feedback-text">${formatted}</div>`;
+  } catch(e) {
+    contentEl.innerHTML = `<div style="color:var(--red-text)">Connection error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '✨ Generate Feedback';
+  }
 }
 
 // ══════════════════════════════════════════════

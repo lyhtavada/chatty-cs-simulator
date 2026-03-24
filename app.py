@@ -986,6 +986,191 @@ def api_toggle_custom(scenario_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/scenarios/from-transcript", methods=["POST"])
+def api_scenarios_from_transcript():
+    """Generate scenarios from a Crisp chat transcript. Leader only."""
+    if session.get("user_role") != "leader":
+        return jsonify({"error": "Leader access required"}), 403
+    if not groq_client:
+        return jsonify({"error": "Groq API not configured"}), 500
+
+    data = request.json
+    transcript = (data.get("transcript") or "").strip()
+    count = min(int(data.get("count", 3)), 10)
+    app_name = data.get("app", "chatty")
+
+    if not transcript:
+        return jsonify({"error": "Transcript is required"}), 400
+
+    product_knowledge = ""
+    pk_file = DATA_DIR / app_name / "product-knowledge.md"
+    if pk_file.exists():
+        product_knowledge = pk_file.read_text(encoding="utf-8")[:3000]
+
+    pk_section = f"\n## Product Knowledge:\n{product_knowledge}\n" if product_knowledge else ""
+
+    prompt = f"""You are a CS training scenario generator for a Shopify app called {app_name.title()}.
+Analyze the following real customer support transcript and generate {count} training scenarios inspired by it.
+Extract the core issues, customer type, and tone from the transcript to create realistic practice scenarios.
+{pk_section}
+## Output format — return ONLY a JSON array:
+[
+  {{
+    "intent": "howto|bug_report|billing|complaint|presales|feature_request|common_issue",
+    "opening_message": "The customer's first message (realistic, 1-3 sentences)",
+    "difficulty": "easy|medium|hard",
+    "category": "How-to|Bug Report|Billing|Complaint|Pre-sales|Feature Request|Common Issue",
+    "tags": ["tag1", "tag2"],
+    "reference_answer": "What a good CS agent should do (2-4 sentences)"
+  }}
+]
+
+Rules:
+- Base scenarios on the real issues found in the transcript
+- Vary difficulty and phrasing — don't copy verbatim from transcript
+- reference_answer must be actionable for a CS agent
+- Return ONLY valid JSON array, no markdown or extra text"""
+
+    try:
+        response = groq_create(
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Here is the transcript:\n\n{transcript}\n\nGenerate {count} scenarios from this."},
+            ],
+            temperature=0.7,
+            max_tokens=4096,
+        )
+        raw = response.choices[0].message.content or "[]"
+        json_match = re.search(r'\[[\s\S]*\]', raw)
+        if not json_match:
+            return jsonify({"error": "Failed to parse AI response", "raw": raw}), 500
+
+        scenarios = json.loads(json_match.group())
+        valid = []
+        for s in scenarios:
+            if not s.get("opening_message"):
+                continue
+            valid.append({
+                "intent": s.get("intent", "general"),
+                "opening_message": s["opening_message"],
+                "difficulty": s.get("difficulty", "medium"),
+                "category": s.get("category", "Other"),
+                "tags": s.get("tags", []),
+                "reference_answer": s.get("reference_answer", ""),
+            })
+        return jsonify({"scenarios": valid})
+
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI returned invalid JSON", "raw": raw}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/dashboard/feedback", methods=["POST"])
+def api_dashboard_feedback():
+    """Generate AI performance feedback from session results."""
+    role = session.get("user_role", "agent")
+    data = request.json
+    agent_filter = data.get("agent")  # None = all agents (leader only)
+    app_name = data.get("app", "chatty")
+
+    # Agents can only get their own feedback
+    if role != "leader":
+        agent_filter = session.get("agent_name")
+        if not agent_filter:
+            return jsonify({"error": "Not logged in"}), 403
+
+    if not groq_client:
+        return jsonify({"error": "Groq API not configured"}), 500
+    if not supabase:
+        return jsonify({"error": "Supabase not configured"}), 500
+
+    try:
+        query = supabase.table("training_results").select("*").order("created_at", desc=True).limit(100)
+        if agent_filter:
+            query = query.eq("agent_name", agent_filter)
+        rows = query.execute().data or []
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    if not rows:
+        return jsonify({"error": "No session data found"}), 404
+
+    # Summarize data for the prompt
+    col_map = {
+        "score_greeting": "Communication",
+        "score_empathy": "Problem Understanding",
+        "score_probing": "Troubleshooting",
+        "score_expectation": "Product Knowledge",
+        "score_troubleshoot": "Language & Tone",
+        "score_followup": "Response Quality",
+        "score_achieve_more": "Proactiveness",
+        "score_farewell": "Process Compliance",
+    }
+    criteria_totals = {v: [] for v in col_map.values()}
+    overall_scores = []
+    agents_seen = set()
+    categories_seen = []
+
+    for row in rows:
+        if row.get("overall_score"):
+            overall_scores.append(row["overall_score"])
+        if row.get("agent_name"):
+            agents_seen.add(row["agent_name"])
+        if row.get("category"):
+            categories_seen.append(row["category"])
+        for col, label in col_map.items():
+            v = row.get(col)
+            if v is not None:
+                criteria_totals[label].append(v)
+
+    criteria_avgs = {k: (sum(v)/len(v) if v else None) for k, v in criteria_totals.items()}
+    overall_avg = sum(overall_scores)/len(overall_scores) if overall_scores else None
+
+    sorted_criteria = sorted([(k, v) for k, v in criteria_avgs.items() if v is not None], key=lambda x: x[1])
+    weakest = sorted_criteria[:3]
+    strongest = sorted_criteria[-2:]
+
+    summary = f"""Sessions analyzed: {len(rows)}
+Overall average score: {overall_avg:.1f}/10 if overall_avg else 'N/A'
+Agents: {', '.join(sorted(agents_seen)) if not agent_filter else agent_filter}
+Common categories: {', '.join(set(categories_seen[:20]))}
+
+Criteria averages:
+""" + "\n".join(f"- {k}: {v:.1f}/10" for k, v in sorted_criteria)
+
+    scope = f"agent '{agent_filter}'" if agent_filter else "all agents combined"
+    is_leader_all = role == "leader" and not agent_filter
+
+    prompt = f"""You are a CS team performance coach reviewing training simulator results for {scope}.
+
+Here is the performance summary:
+{summary}
+
+Write a detailed, actionable performance feedback report. Structure it as:
+1. **Overall Assessment** (2-3 sentences on general performance level)
+2. **Strengths** (top performing areas with specific praise)
+3. **Areas for Improvement** (weakest areas with concrete, specific coaching tips)
+4. **Action Plan** (3-5 bullet points of specific things to practice or focus on)
+{"5. **Team Patterns** (cross-agent observations, consistency notes)" if is_leader_all else ""}
+
+Tone: direct, coaching, constructive. Use specific score numbers. Max 400 words."""
+
+    try:
+        response = groq_create(
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": "Generate the feedback report now."},
+            ],
+            temperature=0.5,
+            max_tokens=1024,
+        )
+        feedback_text = response.choices[0].message.content or ""
+        return jsonify({"feedback": feedback_text, "sessions": len(rows), "scope": scope})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=os.environ.get("DEBUG", "0") == "1")
