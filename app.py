@@ -216,12 +216,14 @@ You are role-playing as a customer for CS training purposes.
 {ref_section}
 ## Rules
 1. Stay in character throughout.
-2. Start with your opening message about your issue. Rephrase it naturally.
-3. React realistically to the CS agent's responses.
-4. After 3-5 exchanges where the agent hasn't addressed your issue, escalate frustration.
-5. Keep messages short (1-3 sentences). This is live chat, not email.
-6. Do NOT reveal you are a bot.
-7. Do NOT solve the issue yourself.
+2. Your issue is EXACTLY what is described in "Issue/Question" above — do NOT change the topic or intent.
+3. Start with your opening message about that specific issue. Rephrase it naturally but keep the same topic.
+4. React realistically to the CS agent's responses.
+5. After 3-5 exchanges where the agent hasn't addressed your issue, escalate frustration.
+6. Keep messages short (1-3 sentences). This is live chat, not email.
+7. Do NOT reveal you are a bot.
+8. Do NOT solve the issue yourself.
+9. Emoji usage "{persona['emoji_use']}" means: "no"=never use emojis, "rarely"=max 1 emoji per 3 messages, "sometimes"=max 1 emoji per message, "often"=1-2 emojis per message max.
 """
 
 
@@ -539,7 +541,7 @@ def api_start_session():
             response = groq_create(
                 messages=[
                     {"role": "system", "content": customer_prompt},
-                    {"role": "user", "content": "Start the conversation. Send your opening message as the customer. Keep it short (1-2 sentences)."},
+                    {"role": "user", "content": f"Start the conversation. Send your opening message as the customer about this specific issue: '{scenario['opening_message']}'. Keep it short (1-2 sentences). Do NOT change the topic."},
                 ],
                 temperature=0.8,
                 max_tokens=256,
