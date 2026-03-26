@@ -3,7 +3,7 @@ services:
     name: live-chat-simulator
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --log-level debug --preload
     envVars:
       - key: GROQ_API_KEY
         sync: false
