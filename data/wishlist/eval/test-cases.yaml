@@ -1,28 +1,242 @@
 # Joy Wishlist — Eval Test Cases
-# STARTER SET — placeholder scenarios so the app selector has content to show.
-# TODO: replace/expand with real cases sourced from cs2.avada.net KB (wishlist-agent)
-# and reports/weekly-faqs/wishlist/*.md, matching the depth of data/chatty/eval/test-cases.yaml.
+# Run these against the bot to measure response quality.
+
+# ─── HOW-TO QUESTIONS ───
 
 - id: wishlist-howto-001
   intent: howto
-  input: "How do I add the wishlist button to my product page?"
+  input: "How do I get started with Joy Wishlist?"
   expected:
-    contains: ["wishlist button", "theme"]
+    contains: ["Enable", "Theme Editor"]
     action: answer
-  tags: [setup, widget]
+  tags: [setup, onboarding]
+
+- id: wishlist-howto-002
+  intent: howto
+  input: "How do I let customers add to their wishlist without creating an account?"
+  expected:
+    contains: ["Allow guest add to wishlist", "Settings"]
+    action: answer
+  tags: [guest, settings]
+
+- id: wishlist-howto-003
+  intent: howto
+  input: "How do I add the wishlist page to my main menu?"
+  expected:
+    contains: ["Menus", "My wishlist"]
+    action: answer
+  tags: [setup, menu]
+
+- id: wishlist-howto-004
+  intent: howto
+  input: "How can I track Add to Wishlist events for my Facebook ads?"
+  expected:
+    contains: ["Custom Pixel", "avada_wishlist:add"]
+    action: answer
+  tags: [analytics, meta_pixel]
+
+- id: wishlist-howto-005
+  intent: howto
+  input: "How do I see exactly which products a specific customer wishlisted?"
+  expected:
+    contains: ["Customers", "Export"]
+    action: answer
+  tags: [customers, export]
+
+# ─── BUG / ISSUE REPORTS ───
 
 - id: wishlist-bug-001
   intent: bug_report
-  input: "The wishlist heart icon isn't showing up on my store."
+  input: "I turned on the header icon setting but it's still not showing on my store."
   expected:
-    contains: ["app embed", "theme"]
+    contains: ["App embed", "Header icon"]
     action: answer
-  tags: [widget, troubleshoot]
+  tags: [widget, header_icon, troubleshoot]
+
+- id: wishlist-bug-002
+  intent: bug_report
+  input: "The add to wishlist button shows on some products but not on this one specific product page."
+  expected:
+    contains: ["template"]
+    action: answer
+  tags: [widget, button, troubleshoot]
+
+- id: wishlist-bug-003
+  intent: bug_report
+  input: "My wishlist page is completely blank, nothing shows up."
+  expected:
+    contains: ["navigation", "App embed"]
+    action: answer
+  tags: [widget, page, troubleshoot]
+
+- id: wishlist-bug-004
+  intent: bug_report
+  input: "I duplicated my theme for a redesign and now the wishlist icon that used to be there is gone."
+  expected:
+    contains: ["theme"]
+    action: escalate
+  tags: [widget, header_icon, theme, troubleshoot]
+
+- id: wishlist-bug-005
+  intent: bug_report
+  input: "I set the icon background to white to make it look transparent but now I can't see the icon at all."
+  expected:
+    contains: ["solid", "transparent"]
+    action: answer
+  tags: [styling, css, troubleshoot]
+
+- id: wishlist-bug-006
+  intent: bug_report
+  input: "A customer says removing one variant from their wishlist removed every other variant of that same product too."
+  expected:
+    action: escalate
+  tags: [bug, variant, troubleshoot]
+
+# ─── PRESALES ───
 
 - id: wishlist-presales-001
   intent: presales
-  input: "Does Wishlist let customers share their wishlist with friends?"
+  input: "Is Joy Wishlist free, or is this just a trial?"
   expected:
-    contains: ["share"]
+    contains: ["free"]
+    action: answer
+  tags: [presales, pricing]
+
+- id: wishlist-presales-002
+  intent: presales
+  input: "Does Joy Wishlist connect to Klaviyo out of the box?"
+  expected:
+    contains: ["Joy Loyalty"]
+    not_contains: ["yes, directly"]
+    action: answer
+  tags: [presales, integration, klaviyo]
+
+- id: wishlist-presales-003
+  intent: presales
+  input: "Can customers share their wishlist with friends via a link?"
+  expected:
+    contains: ["public link"]
     action: answer
   tags: [presales, sharing]
+
+# ─── FEATURE REQUESTS ───
+
+- id: wishlist-feature-001
+  intent: feature_request
+  input: "Can you add back-in-stock notifications for wishlisted products?"
+  expected:
+    contains: ["roadmap"]
+    not_contains: ["yes, available now"]
+    action: answer
+  tags: [feature_request, notifications]
+
+- id: wishlist-feature-002
+  intent: feature_request
+  input: "I want customers to be able to make multiple separate wishlists, like a 'Birthday list' and a 'Everyday list'."
+  expected:
+    contains: ["not", "feedback"]
+    not_contains: ["yes we support that"]
+    action: answer
+  tags: [feature_request, multiple_lists]
+
+- id: wishlist-feature-003
+  intent: feature_request
+  input: "Can you make the export include the Variant SKU column?"
+  expected:
+    contains: ["forward", "team"]
+    not_contains: ["yes it's included"]
+    action: answer
+  tags: [feature_request, export]
+
+# ─── COMPLAINTS ───
+
+- id: wishlist-complaint-001
+  intent: complaint
+  input: "This is ridiculous, I've asked about the header icon position three times and nobody fixed it yet."
+  expected:
+    contains: ["sorry", "apologize"]
+    action: escalate
+  tags: [complaint, sensitive]
+
+- id: wishlist-complaint-002
+  intent: complaint
+  input: "The wishlist button broke my product page layout and I almost uninstalled the app over this."
+  expected:
+    contains: ["sorry", "apologize"]
+    action: escalate
+  tags: [complaint, sensitive]
+
+# ─── INTEGRATION ───
+
+- id: wishlist-integration-001
+  intent: integration
+  input: "Can wishlisted products show up inside my Joy Loyalty widget?"
+  expected:
+    contains: ["separate", "not"]
+    action: answer
+  tags: [integration, joy_loyalty]
+
+- id: wishlist-integration-002
+  intent: integration
+  input: "Do you integrate with Omnisend for wishlist reminder emails?"
+  expected:
+    contains: ["no", "Omnisend"]
+    action: answer
+  tags: [integration, omnisend]
+
+- id: wishlist-integration-003
+  intent: integration
+  input: "Can I import my customers' wishlists from Swym into Joy Wishlist?"
+  expected:
+    contains: ["no import", "feedback"]
+    action: answer
+  tags: [integration, migration]
+
+# ─── OUT OF SCOPE ───
+
+- id: wishlist-oos-001
+  intent: out_of_scope
+  input: "How do I set up a points program so customers earn rewards for purchases?"
+  expected:
+    contains: ["Joy Loyalty"]
+    action: redirect
+  tags: [out_of_scope, joy_loyalty_redirect]
+
+- id: wishlist-oos-002
+  intent: out_of_scope
+  input: "How do I set up live chat and an AI chatbot for my store?"
+  expected:
+    contains: ["Chatty"]
+    action: redirect
+  tags: [out_of_scope, chatty_redirect]
+
+- id: wishlist-oos-003
+  intent: out_of_scope
+  input: "Where is my order? I don't see it in my account."
+  expected:
+    action: redirect
+  tags: [out_of_scope, shopper_not_merchant]
+
+# ─── EDGE CASES ───
+
+- id: wishlist-edge-001
+  intent: ambiguous
+  input: "hide the icon"
+  expected:
+    action: clarify
+  tags: [ambiguous, disambiguation]
+
+- id: wishlist-edge-002
+  intent: bug_report
+  input: "NOTHING WORKS the wishlist is completely broken fix it now"
+  expected:
+    action: clarify
+  tags: [vague, edge_case, sensitive]
+
+- id: wishlist-edge-003
+  intent: multi_intent
+  input: "The header icon isn't showing, and also can I translate the 'Sign in' button, and is there a Klaviyo integration?"
+  expected:
+    contains: ["header icon", "translat"]
+    action: answer
+  tags: [multi_intent, complex]
