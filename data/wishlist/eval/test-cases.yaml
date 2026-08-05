@@ -1,0 +1,28 @@
+# Joy Wishlist — Eval Test Cases
+# STARTER SET — placeholder scenarios so the app selector has content to show.
+# TODO: replace/expand with real cases sourced from cs2.avada.net KB (wishlist-agent)
+# and reports/weekly-faqs/wishlist/*.md, matching the depth of data/chatty/eval/test-cases.yaml.
+
+- id: wishlist-howto-001
+  intent: howto
+  input: "How do I add the wishlist button to my product page?"
+  expected:
+    contains: ["wishlist button", "theme"]
+    action: answer
+  tags: [setup, widget]
+
+- id: wishlist-bug-001
+  intent: bug_report
+  input: "The wishlist heart icon isn't showing up on my store."
+  expected:
+    contains: ["app embed", "theme"]
+    action: answer
+  tags: [widget, troubleshoot]
+
+- id: wishlist-presales-001
+  intent: presales
+  input: "Does Wishlist let customers share their wishlist with friends?"
+  expected:
+    contains: ["share"]
+    action: answer
+  tags: [presales, sharing]

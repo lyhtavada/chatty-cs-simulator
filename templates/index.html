@@ -42,6 +42,20 @@
   .login-btn:hover{background:var(--blue-800)}
   .login-error{color:var(--red-text);font-size:12px;margin-top:8px;display:none}
 
+  /* App switcher (login) */
+  .login-app-row{display:flex;gap:8px;margin-bottom:16px}
+  .login-app-btn{flex:1;padding:10px 6px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:#fff;font-family:var(--font);font-size:12px;font-weight:500;color:var(--gray-600);cursor:pointer;transition:all .15s;text-align:center}
+  .login-app-btn .app-icon{font-size:16px;display:block;margin-bottom:2px}
+  .login-app-btn:hover{border-color:var(--blue-200);color:var(--blue-600)}
+  .login-app-btn.active{background:var(--blue-600);border-color:var(--blue-600);color:#fff}
+  .login-app-btn:disabled{opacity:.4;cursor:not-allowed}
+  .login-app-btn:disabled:hover{border-color:var(--gray-200);color:var(--gray-600)}
+
+  /* App switcher (sidebar) */
+  .app-switch{padding:12px 20px 0}
+  .app-switch-select{width:100%;padding:8px 32px 8px 12px;border:1px solid var(--gray-200);border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;font-weight:500;color:var(--blue-900);background:#fff;appearance:none;outline:none;cursor:pointer}
+  .app-switch-select:focus{border-color:var(--blue-400)}
+
   /* Sidebar */
   .sidebar{width:var(--sidebar-w);flex-shrink:0;background:#fff;border-right:1px solid var(--gray-200);display:flex;flex-direction:column;overflow-y:auto;animation:slideIn .35s ease}
   @keyframes slideIn{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:translateX(0)}}
@@ -391,6 +405,12 @@
       <button class="login-role-btn active" onclick="setLoginRole('agent',this)">CS Agent</button>
       <button class="login-role-btn" onclick="setLoginRole('leader',this)">Leader</button>
     </div>
+    <div class="field-group" style="text-align:left">
+      <label class="field-label">Practice app</label>
+      <div class="login-app-row" id="login-app-row">
+        <!-- populated by loadApps() -->
+      </div>
+    </div>
     <div class="login-pw" id="login-pw">
       <label class="field-label">Leader password</label>
       <input class="field-input" id="login-password" type="password" placeholder="Enter password" />
@@ -407,6 +427,13 @@
     <div class="sidebar-logo">
       <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg></div>
       <div style="flex:1"><div class="logo-text">Simulator</div><div class="logo-sub">CS Training</div></div>
+    </div>
+
+    <div class="app-switch">
+      <div class="select-wrap">
+        <select class="app-switch-select" id="app-switch-select" onchange="switchApp(this.value)"></select>
+        <svg class="select-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4.5l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
     </div>
 
     <div class="sidebar-section">
@@ -797,6 +824,8 @@
 // ══════════════════════════════════════════════
 const STATE = {
   user: null,        // {name, role}
+  app: 'chatty',      // current app: chatty | joy | wishlist
+  apps: [],           // [{id, label, icon, scenario_count}] from /api/apps
   scenarios: [],
   difficulty: 'easy',
   category: 'All',
@@ -816,6 +845,62 @@ const STATE = {
   dashResults: [],       // cached dashboard results for download
   reviewData: null,      // current review context {conversation, feedback, scores, scenario, persona, suggestions}
 };
+
+// ══════════════════════════════════════════════
+//  APPS (Chatty / Joy / Wishlist)
+// ══════════════════════════════════════════════
+let loginApp = 'chatty';
+
+async function loadApps() {
+  try {
+    const res = await fetch('/api/apps');
+    STATE.apps = await res.json();
+  } catch(e) {
+    console.error('Failed to load apps', e);
+    STATE.apps = [{id: 'chatty', label: 'Chatty', icon: '💬', scenario_count: 0}];
+  }
+  renderLoginAppRow();
+  renderAppSwitchSelect();
+}
+
+function renderLoginAppRow() {
+  const row = document.getElementById('login-app-row');
+  const saved = localStorage.getItem('cs_sim_app');
+  if (saved && STATE.apps.some(a => a.id === saved)) loginApp = saved;
+  else if (STATE.apps.length) loginApp = STATE.apps[0].id;
+
+  row.innerHTML = STATE.apps.map(a => `
+    <button type="button" class="login-app-btn ${a.id === loginApp ? 'active' : ''}"
+      ${a.scenario_count === 0 ? 'disabled title="No scenarios yet"' : ''}
+      onclick="setLoginApp('${a.id}', this)">
+      <span class="app-icon">${a.icon}</span>${a.label}
+    </button>
+  `).join('');
+}
+
+function renderAppSwitchSelect() {
+  const sel = document.getElementById('app-switch-select');
+  sel.innerHTML = STATE.apps.map(a =>
+    `<option value="${a.id}" ${a.scenario_count === 0 ? 'disabled' : ''}>${a.icon} ${a.label}</option>`
+  ).join('');
+  sel.value = STATE.app;
+}
+
+function setLoginApp(appId, btn) {
+  loginApp = appId;
+  document.querySelectorAll('.login-app-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function switchApp(appId) {
+  if (appId === STATE.app) return;
+  STATE.app = appId;
+  localStorage.setItem('cs_sim_app', appId);
+  STATE.category = 'All';
+  loadScenarios();
+  loadCustomScenarios();
+  if (STATE.currentPage === 'dashboard') loadDashboard();
+}
 
 // ══════════════════════════════════════════════
 //  LOGIN
@@ -847,7 +932,9 @@ async function doLogin() {
     if (!res.ok) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
 
     STATE.user = {name: data.name, role: data.role};
+    STATE.app = loginApp;
     localStorage.setItem('cs_sim_user', JSON.stringify(STATE.user));
+    localStorage.setItem('cs_sim_app', STATE.app);
     initAppUI();
     loadScenarios();
   } catch(e) { errEl.textContent = 'Connection error'; errEl.style.display = 'block'; }
@@ -861,6 +948,7 @@ function initAppUI() {
   document.getElementById('agent-display-name').textContent = u.name;
   document.getElementById('agent-display-role').textContent = u.role === 'leader' ? 'Leader' : 'CS Agent';
   document.getElementById('agent-avatar').textContent = u.name[0].toUpperCase();
+  renderAppSwitchSelect();
   if (u.role === 'leader') {
     document.getElementById('dash-desc').textContent = 'All agents\' results';
     document.getElementById('nav-generator').style.display = '';
@@ -881,8 +969,14 @@ function doLogout() {
 document.getElementById('login-name').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 document.getElementById('login-password').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
-// Restore session on page load
-(function restoreSession() {
+// Load apps, then restore session on page load
+(async function init() {
+  await loadApps();
+
+  const savedApp = localStorage.getItem('cs_sim_app');
+  if (savedApp && STATE.apps.some(a => a.id === savedApp)) STATE.app = savedApp;
+  else if (STATE.apps.length) STATE.app = STATE.apps[0].id;
+
   try {
     const saved = localStorage.getItem('cs_sim_user');
     if (!saved) return;
@@ -910,7 +1004,7 @@ document.getElementById('login-password').addEventListener('keydown', e => { if(
 // ══════════════════════════════════════════════
 async function loadScenarios() {
   try {
-    const res = await fetch('/api/scenarios?app=chatty');
+    const res = await fetch('/api/scenarios?app=' + encodeURIComponent(STATE.app));
     STATE.scenarios = await res.json();
     updateCategorySelect();
     filterScenarios();
@@ -985,7 +1079,7 @@ async function startSession(params) {
     const res = await fetch('/api/session/start', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({app: 'chatty', ...params}),
+      body: JSON.stringify({app: STATE.app, ...params}),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.error); return; }
@@ -1622,7 +1716,7 @@ async function generateScenarios() {
     const res = await fetch('/api/scenarios/generate', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({topic, count: parseInt(count), difficulty: difficulty || undefined, app: 'chatty'}),
+      body: JSON.stringify({topic, count: parseInt(count), difficulty: difficulty || undefined, app: STATE.app}),
     });
     const data = await res.json();
 
@@ -1713,7 +1807,7 @@ async function saveGeneratedScenarios() {
     const res = await fetch('/api/scenarios/save', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({scenarios: toSave, app: 'chatty'}),
+      body: JSON.stringify({scenarios: toSave, app: STATE.app}),
     });
     const data = await res.json();
 
@@ -1735,7 +1829,7 @@ async function loadCustomScenarios() {
   const listEl = document.getElementById('custom-list');
 
   try {
-    const res = await fetch('/api/scenarios/custom?app=chatty');
+    const res = await fetch('/api/scenarios/custom?app=' + encodeURIComponent(STATE.app));
     const data = await res.json();
 
     if (!Array.isArray(data) || !data.length) {
@@ -1810,7 +1904,7 @@ async function generateFromTranscript() {
     const res = await fetch('/api/scenarios/from-transcript', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({transcript, count: parseInt(count), app: 'chatty'}),
+      body: JSON.stringify({transcript, count: parseInt(count), app: STATE.app}),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -1845,7 +1939,7 @@ async function generateDashFeedback() {
     const res = await fetch('/api/dashboard/feedback', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({agent: agent || null, app: 'chatty'}),
+      body: JSON.stringify({agent: agent || null, app: STATE.app}),
     });
     const data = await res.json();
     if (!res.ok) {
