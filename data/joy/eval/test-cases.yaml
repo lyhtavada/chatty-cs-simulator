@@ -1,0 +1,28 @@
+# Joy Loyalty — Eval Test Cases
+# STARTER SET — placeholder scenarios so the app selector has content to show.
+# TODO: replace/expand with real cases sourced from cs2.avada.net KB (joy-loyalty-agent)
+# and reports/weekly-faqs/joy/*.md, matching the depth of data/chatty/eval/test-cases.yaml.
+
+- id: joy-howto-001
+  intent: howto
+  input: "How do I set up a points program for my store?"
+  expected:
+    contains: ["points", "earning rule"]
+    action: answer
+  tags: [points, setup]
+
+- id: joy-billing-001
+  intent: billing
+  input: "What's the difference between the Joy plans?"
+  expected:
+    contains: ["plan"]
+    action: answer
+  tags: [billing, plans]
+
+- id: joy-complaint-001
+  intent: complaint
+  input: "My customer's points disappeared after a refund and they're furious with me."
+  expected:
+    contains: ["sorry", "apologize"]
+    action: clarify
+  tags: [complaint, points, sensitive]

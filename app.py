@@ -34,6 +34,22 @@ LEADER_PASSWORD = os.environ.get("LEADER_PASSWORD", "avada2024")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant"
 
+# --- Apps ---
+# Whitelist of valid app_name values — also drives the app switcher in the UI.
+APP_REGISTRY = {
+    "chatty": {"label": "Chatty", "icon": "💬"},
+    "joy": {"label": "Joy Loyalty", "icon": "🎁"},
+    "wishlist": {"label": "Joy Wishlist", "icon": "❤️"},
+}
+DEFAULT_APP = "chatty"
+
+
+def resolve_app(app_name: str | None) -> str | None:
+    """Validate app_name against the whitelist. Returns None if invalid."""
+    if not app_name:
+        return DEFAULT_APP
+    return app_name if app_name in APP_REGISTRY else None
+
 # --- Clients ---
 groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
@@ -364,16 +380,17 @@ def load_custom_scenarios(app_name: str = "chatty") -> list[dict]:
 
 
 # --- Product Knowledge for Generator ---
-_product_knowledge_cache: str = ""
+_product_knowledge_cache: dict[str, str] = {}
 
 def load_product_knowledge(app_name: str = "chatty") -> str:
-    global _product_knowledge_cache
-    if _product_knowledge_cache:
-        return _product_knowledge_cache
+    if app_name in _product_knowledge_cache:
+        return _product_knowledge_cache[app_name]
+    content = ""
     pk_file = DATA_DIR / app_name / "product-knowledge.md"
     if pk_file.exists():
-        _product_knowledge_cache = pk_file.read_text(encoding="utf-8")
-    return _product_knowledge_cache
+        content = pk_file.read_text(encoding="utf-8")
+    _product_knowledge_cache[app_name] = content
+    return content
 
 
 # --- Scenario Generation Prompt ---
@@ -486,9 +503,25 @@ def api_login():
     return jsonify({"ok": True, "name": name, "role": role})
 
 
+@app.route("/api/apps")
+def api_apps():
+    """List available apps for the app switcher, with scenario counts."""
+    apps = []
+    for app_id, meta in APP_REGISTRY.items():
+        apps.append({
+            "id": app_id,
+            "label": meta["label"],
+            "icon": meta["icon"],
+            "scenario_count": len(get_scenarios(app_id)),
+        })
+    return jsonify(apps)
+
+
 @app.route("/api/scenarios")
 def api_scenarios():
-    app_name = request.args.get("app", "chatty")
+    app_name = resolve_app(request.args.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
     scenarios = get_scenarios(app_name)
     # Return without reference_answer (keep it server-side)
     safe = []
@@ -508,7 +541,9 @@ def api_scenarios():
 def api_start_session():
     """Start a new chat session. Returns opening customer message."""
     data = request.json
-    app_name = data.get("app", "chatty")
+    app_name = resolve_app(data.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
     scenario_id = data.get("scenario_id")
     difficulty = data.get("difficulty", "medium")
 
@@ -553,6 +588,7 @@ def api_start_session():
     # Store session data in memory
     session_id = f"{int(time.time())}_{random.randint(1000,9999)}"
     chat_sessions[session_id] = {
+        "app_name": app_name,
         "scenario": scenario,
         "persona": persona,
         "customer_prompt": customer_prompt,
@@ -721,6 +757,9 @@ def api_end_session():
     # Save to Supabase
     if supabase:
         try:
+            # TODO: training_results table has no app_name column yet — once
+            # added, insert sess["app_name"] here so leader dashboard/results
+            # can filter per app instead of mixing Chatty/Joy/Wishlist runs.
             row = {
                 "agent_name": agent_name,
                 "scenario_id": scenario["id"],
@@ -847,7 +886,9 @@ def api_generate_scenarios():
     topic = data.get("topic", "").strip()
     count = min(int(data.get("count", 5)), 20)  # Max 20 at a time
     difficulty = data.get("difficulty")  # optional filter
-    app_name = data.get("app", "chatty")
+    app_name = resolve_app(data.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
 
     if not topic:
         return jsonify({"error": "Topic is required"}), 400
@@ -904,7 +945,9 @@ def api_save_scenarios():
 
     data = request.json
     scenarios = data.get("scenarios", [])
-    app_name = data.get("app", "chatty")
+    app_name = resolve_app(data.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
     created_by = session.get("agent_name", "unknown")
 
     saved = 0
@@ -940,7 +983,9 @@ def api_list_custom():
     if not supabase:
         return jsonify([])
 
-    app_name = request.args.get("app", "chatty")
+    app_name = resolve_app(request.args.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
     try:
         data = supabase.table("custom_scenarios") \
             .select("*") \
@@ -997,7 +1042,9 @@ def api_scenarios_from_transcript():
     data = request.json
     transcript = (data.get("transcript") or "").strip()
     count = min(int(data.get("count", 3)), 10)
-    app_name = data.get("app", "chatty")
+    app_name = resolve_app(data.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
 
     if not transcript:
         return jsonify({"error": "Transcript is required"}), 400
@@ -1072,7 +1119,12 @@ def api_dashboard_feedback():
     role = session.get("user_role", "agent")
     data = request.json
     agent_filter = data.get("agent")  # None = all agents (leader only)
-    app_name = data.get("app", "chatty")
+    app_name = resolve_app(data.get("app"))
+    if not app_name:
+        return jsonify({"error": "Invalid app"}), 400
+    # NOTE: training_results has no app_name column yet, so this doesn't
+    # filter by app — results from all apps are mixed together (see TODO
+    # in api_end_session's Supabase insert).
 
     # Agents can only get their own feedback
     if role != "leader":
