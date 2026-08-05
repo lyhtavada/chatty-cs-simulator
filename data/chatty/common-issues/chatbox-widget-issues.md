@@ -53,13 +53,12 @@ A: The Chatty app assigns FAQ content to the default page template, which can af
 
 Q: The merchant wants to move the live chat button to a different position.
 Q: How to change the position of the chat widget on the store.
-A: The chatbox button position can be adjusted in Chatbox > Appearance > Set chatbox button > Select button alignment.
+A: Chatty has a built-in Position control — no custom CSS needed for most cases. Go to **Chatbox → Appearance → Chatbox button → Position**: either drag the dot to place the button, or pick a corner **Anchor** (e.g. Bottom right) and fine-tune the **Horizontal offset** / **Vertical offset** (each adjustable 0–45%).
 
 If the merchant needs more specific positioning:
 1. Ask the merchant for their desired position.
-2. For basic alignment changes, use the built-in button alignment settings.
-3. For custom positioning, suggest CSS customization (if the merchant has coding knowledge).
-4. If the merchant can't do it themselves, create a ticket for the TS team.
+2. For standard repositioning, the Position control above covers it.
+3. Only fall back to **Chatbox → Advanced → Custom CSS** for cases the offset range can't cover (e.g. beyond the 45% offset limit, or pixel-precise placement) — forward these to the TS team, don't provide CSS code directly.
 
 ---
 
@@ -67,7 +66,7 @@ Q: How do I remove Chatty branding from the widget?
 Q: Merchant wants to remove the "Powered by Chatty" watermark.
 A: To remove branding:
 
-1. Go to DevZone > General > Enable "Remove branding."
+1. The merchant has no self-serve setting for this — it is applied on our side. Have the branding removed for the store.
 2. Notify the merchant to check.
 3. Communicate: "Normally, this option is only available for paid plans. However, we've helped remove the branding for you this time as a special support."
 4. After removing branding, proactively offer to help with other features.
@@ -99,5 +98,5 @@ A: For newly installed apps, the category icons feature is locked by default.
 
 **Solution:**
 1. Get the merchant's Store URL.
-2. Go to DevZone and enable the category icons feature.
+2. There is no merchant-side toggle for this — have the category icons feature unlocked for that store on our side.
 3. Notify the merchant to check if icons are now available.

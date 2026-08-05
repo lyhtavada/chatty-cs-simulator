@@ -6,7 +6,9 @@ source: notion/Chatty FAQs
 
 Q: What does a merchant need to connect WhatsApp to Chatty?
 Q: WhatsApp connection requirements checklist.
-A: The merchant needs all of the following:
+A: **Plan note:** Connecting WhatsApp itself is available on **all plans, including Free**. Only **AI auto-reply on WhatsApp** requires the **Pro** or **Plus** plan — connection and manual/human replies work on any plan. The same split applies to Messenger and Instagram.
+
+The merchant needs all of the following to connect:
 
 **1. Meta Business Manager account**
 - Must have a valid Meta Business Manager with **Business Admin** role.

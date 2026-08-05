@@ -9,10 +9,10 @@ Q: Desktop push notifications don't work for Chatty.
 A: Check these settings in order:
 
 **Step 1: Verify app notification settings**
-- Ensure push notification is enabled for new/unread messages in App Settings.
+- Go to **Settings → Notifications**. Under **Web push**, if the label shows "Not subscribe," click **Subscribe** first, then click **Manage**. Ensure the relevant notification triggers are toggled on.
 
 **Step 2: Verify browser and device settings**
-- Browser must have notifications allowed for Chatty/app.meetchatty.com.
+- Browser must have notifications allowed for Chatty/app.chatty.net.
 - PC/laptop system settings must allow notifications (not in Silent/Do Not Disturb mode).
 - Device must not be in presentation mode or screen recording mode.
 
@@ -26,6 +26,27 @@ A: Check these settings in order:
 - If the issue persists, forward to dev team with detailed info.
 
 **Meanwhile:** Recommend email notifications or installing the Chatty mobile app as alternatives.
+
+---
+
+Q: Notification banners show up but there's no sound when a new message arrives.
+Q: The merchant says notification sound stopped working, even though the settings look correct.
+A: This is a different problem from "no notifications at all" — the visual banner is arriving, only the sound is missing.
+
+**Step 1: Check the sound settings in Chatty**
+- Go to **Settings → Notifications** → confirm the relevant triggers have Web/desktop notifications on (click **Subscribe** if it shows "Not subscribe").
+- Under **Sound settings**, confirm the sound toggle is on and a sound option is selected (Only first message, or All messages).
+
+**Step 2: Check the browser and OS**
+- The browser tab must not be muted (right-click the tab → Unmute site).
+- Do Not Disturb / Focus must be off.
+- On macOS: System Settings → Notifications → [browser] → Allow notifications + Play sound for notifications.
+
+**Step 3: Known compatibility limitation (macOS + Chrome)**
+- On **macOS with Google Chrome** (and other Chromium browsers), push-notification **sound** is a documented Chrome/macOS compatibility issue — not a Chatty bug. Visual banners work; the sound does not play.
+- Recommend **Safari** to resolve it — Chatty can be installed as a desktop app in Safari (Share icon → Add to Dock), and notification sound works there.
+
+**If sound still fails across multiple devices and multiple browsers** after all of the above, escalate with: device model, OS version, browser + version, and confirmation of which steps were already checked.
 
 ---
 

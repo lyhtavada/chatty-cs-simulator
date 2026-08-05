@@ -57,14 +57,13 @@ A: **CS must NEVER independently offer discounts.** All offers require Sales tea
 
 Q: What is the LinkedIn 40% discount promotion?
 Q: A merchant is asking about a discount for following Chatty on LinkedIn.
-A: This is a promotional campaign offering 40% off for 1 month for following Chatty on LinkedIn.
+A: CS must never independently offer or confirm a discount — all discount promotions require Sales team or CSL approval.
 
-- The banner displays on the Dashboard.
-- For merchants with average monthly orders > 40: request a screenshot of the LinkedIn follow, then send discount code `LINKEDIN-FOLLOWER-40OFF-1MO`.
-- For other merchants: the promotion does not apply.
+- If the merchant references a promotional banner or offer, don't confirm eligibility or a discount code yourself.
+- Collect the details (which promotion, what the merchant was shown) and check internally with the team before promising anything.
 
 ---
 
 Q: How do I enable legacy plans for a merchant?
 Q: Merchant needs access to old pricing plans.
-A: Go to DevZone > General to enable legacy plans for the merchant.
+A: This is not self-serve for CS. Collect the merchant's current plan and when they installed the app, then escalate to CS Leader — do not attempt to enable legacy plans directly.

@@ -4,7 +4,7 @@ topic: Access & Login Issues
 source: notion/Chatty FAQs
 ---
 
-Q: The merchant sees "Account not activated" when logging into app.meetchatty.com.
+Q: The merchant sees "Account not activated" when logging into app.chatty.net.
 Q: Merchant can't log in — account not activated error.
 A: Common causes:
 
@@ -15,12 +15,12 @@ A: Common causes:
 
 **Solution:**
 - Guide the merchant to open Chatty from Shopify Admin first (Apps > Chatty) to activate the account.
-- After activation, they can use app.meetchatty.com.
+- After activation, they can use app.chatty.net.
 - If the issue persists, suggest clearing browser cache and trying again.
 
 ---
 
-Q: The merchant or team member gets "Incorrect email or password" on app.meetchatty.com.
+Q: The merchant or team member gets "Incorrect email or password" on app.chatty.net.
 Q: Agent can't log in to the Chatty web app.
 A: This depends on the sign-up method used:
 
@@ -53,7 +53,7 @@ A: Chatty is hosted on Google Cloud, which is commonly blocked by China's Great 
 1. Confirm the merchant is located in China.
 2. If not using a VPN: guide them to use a reputable VPN that works in China.
 3. If already using a VPN: suggest trying a different VPN or network.
-4. Send the standalone link: `https://app.meetchatty.com` and instruct them to try with VPN enabled.
+4. Send the standalone link: `https://app.chatty.net` and instruct them to try with VPN enabled.
 5. If other apps work fine, explain Chatty's Google Cloud hosting limitation.
 6. Escalate to dev only if VPN + standalone link still doesn't work.
 
@@ -64,3 +64,16 @@ Q: Can I use one Chatty account for multiple Shopify stores?
 A: Each Shopify store requires its own Chatty installation. The merchant can access each store's Chatty separately through their Shopify Admin.
 
 For team members who work across multiple stores, they can be invited as team members on each store's Chatty installation and switch between them.
+
+---
+
+Q: A staff/admin account intermittently loses access, or sees a message that "Chatty needs to be updated by the owner" — it seems to fix itself, then comes back.
+Q: A team member gets randomly blocked from Chatty with an update message.
+A: This message comes from **Shopify**, not from Chatty. When a Chatty update requires new permissions, Shopify asks the **store owner** (the primary account holder) to approve them. Until the owner approves, non-owner accounts can get blocked when starting a new session — which is why it appears intermittently.
+
+**Solution:**
+1. Confirm the affected user is **not** the store owner.
+2. Ask the **store owner** to open Chatty from Shopify Admin → Apps → Chatty and approve the pending permission update.
+3. Once the owner approves, the message stops appearing for all staff.
+
+Do not treat this as a Chatty bug or escalate to dev — it is Shopify's standard permission-approval flow.

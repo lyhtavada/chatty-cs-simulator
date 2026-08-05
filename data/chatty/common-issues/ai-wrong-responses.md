@@ -107,3 +107,21 @@ A: This can happen when AI training data is incomplete or not synced properly.
 3. If settings are correct: reproduce the issue on the storefront. If confirmed, forward to dev team with full details.
 4. If settings are incomplete: guide the merchant to enable and sync, then test again.
 5. Monitor and update the merchant on progress.
+
+---
+
+Q: The AI says "I don't have that information" or "we don't have details on that" even though the merchant already added and synced the data.
+Q: The merchant added products/FAQs/discounts and ran a sync, but the AI still says it doesn't know.
+A: The most common cause is that the training source's **enable toggle for that topic is off** — syncing data and letting the AI *use* it are two separate steps. The four store sources (Products, Collections, Discounts, FAQs) sync into Chatty automatically, but the AI is not allowed to use any of them until the store turns that source on.
+
+**Step 1: Identify which source the question belongs to.** Ask what kind of question the AI couldn't answer, and map it to a Training data tab: Discount/promo → Discounts tab; Product → Products tab; Collection → Collections tab; Market/regional pricing → Markets tab; Policy/how-to → FAQs or Custom knowledge tab.
+
+**Step 2: Check the source's enable toggle first.** Go to **AI agent → Training data → [the matching tab]** and confirm the "Enable your AI agent to answer customer questions about [topic]" toggle is **ON**. If it's off, the AI says it has no information even with the data fully synced.
+
+**Step 3: Confirm the data actually loaded.** On the same tab, check the "X items learned" badge — if it shows 0, the data hasn't come in yet. Check "Last updated" — if it shows N/A, no sync has ever run. Click **Sync now** and confirm the count is greater than 0.
+
+**Step 4: Re-test** in **AI agent → Test AI → Test now** with the same question.
+
+**Step 5: If the toggle is on, count is above 0, and it still says no information** — escalate to CS with: store URL, which Training data tab, screenshot showing the toggle ON plus the "X learned" count, and the exact question asked.
+
+**Exception — market/translated-domain product URLs:** if the failing question contained a translated or market-specific domain link (e.g. a `.pl` or `.fr` storefront URL), this is a different, known limitation — Chatty stores product data against the main domain only, so a URL from a translated/market domain won't resolve to the synced product even though the product is active and synced. Don't route this case to the toggle/sync checks above; the workaround is referencing the product by name or SKU instead of pasting the translated-domain URL.

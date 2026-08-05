@@ -107,7 +107,7 @@
   intent: billing
   input: "What's included in the Pro plan?"
   expected:
-    contains: ["300", "Smart", "CSAT"]
+    contains: ["500", "Smart", "CSAT"]
     action: answer
   tags: [billing, plans]
 

@@ -68,7 +68,7 @@ Q: AI keeps asking unnecessary follow-up questions after answering.
 A: To disable follow-up questions:
 
 1. Confirm the merchant wants the AI to answer directly without follow-ups.
-2. Disable the feature in DevZone: toggle off the follow-up questions option.
+2. Follow-up questions come from the "Product question suggestions" scenario — check first whether the merchant can turn that off themselves. If it still appears after that, it needs to be switched off for them on our side; hand it over to the team to apply.
 3. Explain the impact: responses may be shorter and less personalized after disabling.
 4. Ask the merchant to test again and confirm the behavior matches expectations.
 
@@ -76,11 +76,12 @@ A: To disable follow-up questions:
 
 Q: How do I add bonus AI conversations for a merchant?
 Q: Merchant ran out of AI conversations, how to add more?
-A: To add AI conversation bonus:
+A: CS cannot self-extend the AI conversation limit — this requires PM approval, since it affects billing and product strategy.
 
-1. Go to DevZone > Testing.
-2. Enter the number of conversations to add in the "Limit" field.
-3. Click "Set."
+1. Collect: store URL, current plan, average monthly chat volume, and whether the merchant is considering an upgrade.
+2. If the next plan up would cover their volume, recommend upgrading first.
+3. If a temporary extension is still needed, post in `#sale-cs-success` and tag PM with the collected details, then wait for approval before applying any change.
+4. Once approved, confirm the extension with the merchant.
 
 ---
 
