@@ -1515,8 +1515,8 @@ function showPage(page) {
 async function loadDashboard() {
   try {
     const url = STATE.user?.role === 'leader'
-      ? '/api/results'
-      : `/api/results?agent=${encodeURIComponent(STATE.user?.name || '')}`;
+      ? `/api/results?app=${encodeURIComponent(STATE.app)}`
+      : `/api/results?agent=${encodeURIComponent(STATE.user?.name || '')}&app=${encodeURIComponent(STATE.app)}`;
     const res = await fetch(url);
     const results = await res.json();
     if (!Array.isArray(results)) return;

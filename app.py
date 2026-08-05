@@ -757,11 +757,9 @@ def api_end_session():
     # Save to Supabase
     if supabase:
         try:
-            # TODO: training_results table has no app_name column yet — once
-            # added, insert sess["app_name"] here so leader dashboard/results
-            # can filter per app instead of mixing Chatty/Joy/Wishlist runs.
             row = {
                 "agent_name": agent_name,
+                "app_name": sess.get("app_name", DEFAULT_APP),
                 "scenario_id": scenario["id"],
                 "intent": scenario["intent"],
                 "category": scenario.get("category", "Other"),
@@ -821,11 +819,18 @@ def api_results():
 
     agent_name = request.args.get("agent")
     role = session.get("user_role", "agent")
+    app_filter = request.args.get("app")  # optional — omit to see all apps
+    if app_filter:
+        app_filter = resolve_app(app_filter)
+        if not app_filter:
+            return jsonify({"error": "Invalid app"}), 400
 
     try:
         query = supabase.table("training_results").select("*").order("created_at", desc=True).limit(200)
         if role != "leader" and agent_name:
             query = query.eq("agent_name", agent_name)
+        if app_filter:
+            query = query.eq("app_name", app_filter)
         data = query.execute().data or []
 
         # Column-to-criteria mapping (reusing existing DB columns)
@@ -849,6 +854,7 @@ def api_results():
             results.append({
                 "timestamp": row.get("created_at", ""),
                 "agent": row.get("agent_name", "Anonymous"),
+                "app": row.get("app_name", DEFAULT_APP),
                 "scenario_id": row.get("scenario_id", ""),
                 "intent": row.get("intent", ""),
                 "category": row.get("category", ""),
@@ -1122,9 +1128,6 @@ def api_dashboard_feedback():
     app_name = resolve_app(data.get("app"))
     if not app_name:
         return jsonify({"error": "Invalid app"}), 400
-    # NOTE: training_results has no app_name column yet, so this doesn't
-    # filter by app — results from all apps are mixed together (see TODO
-    # in api_end_session's Supabase insert).
 
     # Agents can only get their own feedback
     if role != "leader":
@@ -1138,7 +1141,7 @@ def api_dashboard_feedback():
         return jsonify({"error": "Supabase not configured"}), 500
 
     try:
-        query = supabase.table("training_results").select("*").order("created_at", desc=True).limit(100)
+        query = supabase.table("training_results").select("*").order("created_at", desc=True).limit(100).eq("app_name", app_name)
         if agent_filter:
             query = query.eq("agent_name", agent_filter)
         rows = query.execute().data or []
