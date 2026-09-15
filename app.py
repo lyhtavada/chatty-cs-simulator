@@ -31,7 +31,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 LEADER_PASSWORD = os.environ.get("LEADER_PASSWORD", "avada2024")
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"  # llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16
 GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant"
 
 # --- Apps ---
@@ -60,7 +60,12 @@ def groq_create(**kwargs):
         return groq_client.chat.completions.create(model=GROQ_MODEL, **kwargs)
     except Exception as e:
         err_str = str(e)
-        if "429" in err_str or "rate_limit_exceeded" in err_str:
+        if (
+            "429" in err_str
+            or "rate_limit_exceeded" in err_str
+            or "decommissioned" in err_str
+            or "model_not_found" in err_str
+        ):
             # Fallback to lighter model
             return groq_client.chat.completions.create(model=GROQ_FALLBACK_MODEL, **kwargs)
         raise
