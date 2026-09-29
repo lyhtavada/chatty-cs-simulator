@@ -10,6 +10,7 @@ Serves the HTML frontend and provides API endpoints for:
 """
 
 import os
+import sys
 import json
 import random
 import re
@@ -55,20 +56,23 @@ groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 
 def groq_create(**kwargs):
-    """Call Groq API with automatic fallback to a secondary model on rate limit."""
+    """Call Groq API, falling back to a secondary model on ANY primary failure.
+
+    Previously only 429/decommissioned errors fell back, so every other Groq error
+    (5xx, over-capacity, gpt-oss tool_use_failed 400s, timeouts) surfaced to the
+    trainee as a generic "connection error" bubble.
+    """
     try:
-        return groq_client.chat.completions.create(model=GROQ_MODEL, **kwargs)
+        # gpt-oss is a reasoning model: reasoning tokens count toward max_tokens,
+        # so keep effort low or a 256-token budget can end with empty content.
+        return groq_client.chat.completions.create(
+            model=GROQ_MODEL, reasoning_effort="low", **kwargs
+        )
     except Exception as e:
-        err_str = str(e)
-        if (
-            "429" in err_str
-            or "rate_limit_exceeded" in err_str
-            or "decommissioned" in err_str
-            or "model_not_found" in err_str
-        ):
-            # Fallback to lighter model
-            return groq_client.chat.completions.create(model=GROQ_FALLBACK_MODEL, **kwargs)
-        raise
+        print(f"[groq] primary {GROQ_MODEL} failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        return groq_client.chat.completions.create(model=GROQ_FALLBACK_MODEL, **kwargs)
+
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 # --- In-memory chat session store (avoids cookie size limit) ---
@@ -240,11 +244,12 @@ You are role-playing as a customer for CS training purposes.
 2. Your issue is EXACTLY what is described in "Issue/Question" above — do NOT change the topic or intent.
 3. Start with your opening message about that specific issue. Rephrase it naturally but keep the same topic.
 4. React realistically to the CS agent's responses.
-5. After 3-5 exchanges where the agent hasn't addressed your issue, escalate frustration.
+5. After 3-5 exchanges where the agent hasn't addressed your issue, escalate frustration — but only if it's genuinely still unresolved, not on every turn.
 6. Keep messages short (1-3 sentences). This is live chat, not email.
 7. Do NOT reveal you are a bot.
 8. Do NOT solve the issue yourself.
-9. Emoji usage "{persona['emoji_use']}" means: "no"=never use emojis, "rarely"=max 1 emoji per 3 messages, "sometimes"=max 1 emoji per message, "often"=1-2 emojis per message max.
+9. Once the agent has actually answered your question or fixed your issue, say so plainly (e.g. "ok that works, thanks!") and END the conversation — do NOT invent a new question, a second issue, or keep chatting after you're satisfied. A real merchant leaves once they got what they needed.
+10. Emoji usage "{persona['emoji_use']}" means: "no"=never use emojis, "rarely"=max 1 emoji per 3 messages, "sometimes"=max 1 emoji per message, "often"=1-2 emojis per message max.
 """
 
 
@@ -417,43 +422,106 @@ def build_gen_prompt(topic: str, count: int, app_name: str, difficulty: str | No
 {product_knowledge}
 """
 
-    return f"""You are a CS training scenario generator for a Shopify app called {app_name.title()}.
-
-Generate exactly {count} realistic customer support scenarios based on this topic: "{topic}"
-{diff_guide}
-{pk_section}
-
-## Examples of good scenarios
-
-Example 1 (easy — howto):
-{{
+    examples_by_app = {
+        "chatty": """Example 1 (easy — howto):
+{
   "intent": "howto",
   "opening_message": "Hi, I just installed Chatty and I'm trying to set up the AI assistant. Where do I start?",
   "difficulty": "easy",
   "category": "How-to",
   "tags": ["ai", "setup", "new_user"],
   "reference_answer": "Guide the merchant to AI Assistant section, help them add data sources (products auto-sync, add custom Q&As), configure AI instructions, and test using the built-in Test feature."
-}}
+}
 
 Example 2 (medium — bug_report):
-{{
+{
   "intent": "bug_report",
   "opening_message": "The AI is showing $29.99 for a product that costs $39.99 on my French market domain. Customers are complaining about the wrong price.",
   "difficulty": "medium",
   "category": "Bug Report",
   "tags": ["ai", "pricing", "markets"],
   "reference_answer": "Check if Shopify Markets is set up and 'Sync Markets' is enabled in AI settings. Reproduce by visiting the market domain. If Markets configured correctly but issue persists, request staff access and escalate to dev team."
-}}
+}
 
 Example 3 (hard — complaint):
-{{
+{
   "intent": "complaint",
   "opening_message": "I've been paying $68.99/month for Pro and the AI STILL gives wrong answers after 3 months. I've contacted support 4 times and nobody fixed it. I want a full refund NOW or I'm leaving a 1-star review.",
   "difficulty": "hard",
   "category": "Complaint",
   "tags": ["complaint", "refund", "ai", "sensitive"],
   "reference_answer": "Apologize sincerely, acknowledge the repeated frustration. Ask for specific chat IDs where AI was wrong. Review AI data sources and instructions. NEVER approve refund without CSL approval. Escalate to CS Leader with full context. Offer to personally follow up until resolved."
-}}
+}""",
+        "joy": """Example 1 (easy — howto):
+{
+  "intent": "howto",
+  "opening_message": "hey, how do i set up birthday rewards for my customers? i'm on essential plan",
+  "difficulty": "easy",
+  "category": "How-to",
+  "tags": ["earning", "birthday", "setup"],
+  "reference_answer": "Guide the merchant to Joy Admin > Reward programs > Earning programs > Birthday reward (Essential+). Have them set the points/reward and confirm it's enabled."
+}
+
+Example 2 (medium — bug_report):
+{
+  "intent": "bug_report",
+  "opening_message": "a customer redeemed points for a discount but it's not applying at checkout, she's asking me why",
+  "difficulty": "medium",
+  "category": "Bug Report",
+  "tags": ["redeem", "discount", "troubleshoot"],
+  "reference_answer": "Explain the redeem code does not auto-apply — customer must click Apply in the widget/loyalty page, or copy/paste at checkout, unless Ultimate + Shopify Plus + Checkout Extensibility is set up. Confirm the code wasn't already used or combined with another discount."
+}
+
+Example 3 (hard — complaint):
+{
+  "intent": "complaint",
+  "opening_message": "im paying $129/mo for Advanced and my referral program has been broken for a week, customers arent getting their rewards. this is costing me money, fix it or ill downgrade",
+  "difficulty": "hard",
+  "category": "Complaint",
+  "tags": ["complaint", "referral", "sensitive"],
+  "reference_answer": "Apologize, ask for a specific referrer/referee example (emails + order). Check referral flow: same email at claim vs checkout, 7-day cookie window, order reached Paid/Fulfilled trigger, anti-cheat block. Never promise a refund or credit without CSL approval; escalate with full context if not user error."
+}""",
+        "wishlist": """Example 1 (easy — howto):
+{
+  "intent": "howto",
+  "opening_message": "hi, how do i show the wishlist icon on my product pages?",
+  "difficulty": "easy",
+  "category": "How-to",
+  "tags": ["widget", "setup"],
+  "reference_answer": "Guide the merchant to enable the Wishlist app embed in the theme editor and confirm the icon placement on product/collection pages."
+}
+
+Example 2 (medium — bug_report):
+{
+  "intent": "bug_report",
+  "opening_message": "customers say items disappear from their wishlist after a few days, is there some kind of expiry?",
+  "difficulty": "medium",
+  "category": "Bug Report",
+  "tags": ["wishlist", "troubleshoot"],
+  "reference_answer": "Check whether the customer is a guest (browser/cookie-based wishlist, cleared on cache clear or device switch) vs logged-in (persisted to account). Recommend logging in to keep the wishlist permanently."
+}
+
+Example 3 (hard — complaint):
+{
+  "intent": "complaint",
+  "opening_message": "the wishlist widget straight up broke my theme layout after your last update, my store looks broken right now, need this fixed asap",
+  "difficulty": "hard",
+  "category": "Complaint",
+  "tags": ["complaint", "widget", "sensitive"],
+  "reference_answer": "Apologize, ask for the store URL to see the layout break live. Check for theme/widget CSS conflicts, recent app or theme updates. Offer to disable the widget temporarily while investigating, escalate to dev if it's a genuine app bug."
+}""",
+    }
+    examples = examples_by_app.get(app_name, examples_by_app["chatty"])
+
+    return f"""You are a CS training scenario generator for a Shopify app called {app_name.title()}.
+
+Generate exactly {count} realistic customer support scenarios based on this topic: "{topic}"
+{diff_guide}
+{pk_section}
+
+## Examples of good scenarios (this app — match this vocabulary, pricing, and feature names, not any other app's)
+
+{examples}
 
 ## Output format
 
@@ -653,6 +721,7 @@ def api_send_message():
             customer_reply = response.choices[0].message.content or customer_reply
         except Exception as e:
             err_str = str(e)
+            print(f"[groq] customer reply failed (session {session_id}): {type(e).__name__}: {err_str}", file=sys.stderr, flush=True)
             if "429" in err_str or "rate_limit_exceeded" in err_str:
                 customer_reply = "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau ít phút nhé!"
             else:
