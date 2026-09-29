@@ -33,7 +33,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 LEADER_PASSWORD = os.environ.get("LEADER_PASSWORD", "avada2024")
 GROQ_MODEL = "openai/gpt-oss-120b"  # llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16
-GROQ_FALLBACK_MODEL = "llama-3.1-8b-instant"
+GROQ_FALLBACK_MODEL = "openai/gpt-oss-20b"  # llama-3.1-8b-instant was also decommissioned 2026-08-16 (Groq-recommended replacement)
 
 # --- Apps ---
 # Whitelist of valid app_name values — also drives the app switcher in the UI.
@@ -70,7 +70,9 @@ def groq_create(**kwargs):
         )
     except Exception as e:
         print(f"[groq] primary {GROQ_MODEL} failed: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
-        return groq_client.chat.completions.create(model=GROQ_FALLBACK_MODEL, **kwargs)
+        return groq_client.chat.completions.create(
+            model=GROQ_FALLBACK_MODEL, reasoning_effort="low", **kwargs
+        )
 
 
 def _error_tag(e: Exception) -> str:
