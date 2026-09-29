@@ -73,6 +73,19 @@ def groq_create(**kwargs):
         return groq_client.chat.completions.create(model=GROQ_FALLBACK_MODEL, **kwargs)
 
 
+def _error_tag(e: Exception) -> str:
+    """Short diagnostic tag shown in the error bubble: deploy version + Groq status/code."""
+    version = os.environ.get("RENDER_GIT_COMMIT", "local")[:7]
+    status = getattr(e, "status_code", None)
+    code = ""
+    body = getattr(e, "body", None)
+    if isinstance(body, dict):
+        err = body.get("error", body)
+        if isinstance(err, dict):
+            code = err.get("code") or err.get("type") or ""
+    return f"v{version} · {status or type(e).__name__}{' ' + code if code else ''}"
+
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 # --- In-memory chat session store (avoids cookie size limit) ---
@@ -725,7 +738,7 @@ def api_send_message():
             if "429" in err_str or "rate_limit_exceeded" in err_str:
                 customer_reply = "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau ít phút nhé!"
             else:
-                customer_reply = "Xin lỗi, có lỗi kết nối. Vui lòng thử lại!"
+                customer_reply = f"Xin lỗi, có lỗi kết nối. Vui lòng thử lại! ({_error_tag(e)})"
 
     sess["history"].append({"role": "assistant", "content": customer_reply})
 
